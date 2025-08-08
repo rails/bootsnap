@@ -1,0 +1,9 @@
+
+{
+	"name": "bootsnap",
+	"image": "ghcr.io/rails/devcontainer/images/ruby:3.4.5",
+
+	"features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+	}
+}

@@ -14,12 +14,12 @@ Gem::Specification.new do |spec|
 
   spec.summary       = "Boot large ruby/rails apps faster"
   spec.description   = spec.summary
-  spec.homepage      = "https://github.com/Shopify/bootsnap"
+  spec.homepage      = "https://github.com/rails/bootsnap"
 
   spec.metadata = {
-    "bug_tracker_uri" => "https://github.com/Shopify/bootsnap/issues",
-    "changelog_uri" => "https://github.com/Shopify/bootsnap/blob/main/CHANGELOG.md",
-    "source_code_uri" => "https://github.com/Shopify/bootsnap",
+    "bug_tracker_uri" => "https://github.com/rails/bootsnap/issues",
+    "changelog_uri" => "https://github.com/rails/bootsnap/blob/main/CHANGELOG.md",
+    "source_code_uri" => "https://github.com/rails/bootsnap",
     "allowed_push_host" => "https://rubygems.org",
   }
 

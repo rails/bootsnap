@@ -12,7 +12,7 @@ if %w[ruby truffleruby].include?(RUBY_ENGINE)
   append_cflags ["-O3", "-std=c99"]
 
   # ruby.h has some -Wpedantic fails in some cases
-  # (e.g. https://github.com/Shopify/bootsnap/issues/15)
+  # (e.g. https://github.com/rails/bootsnap/issues/15)
   unless ["0", "", nil].include?(ENV["BOOTSNAP_PEDANTIC"])
     append_cflags([
       "-Wall",

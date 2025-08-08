@@ -1,4 +1,4 @@
-# Bootsnap [![Actions Status](https://github.com/Shopify/bootsnap/workflows/ci/badge.svg)](https://github.com/Shopify/bootsnap/actions)
+# Bootsnap [![Actions Status](https://github.com/rails/bootsnap/workflows/ci/badge.svg)](https://github.com/rails/bootsnap/actions)
 
 Bootsnap is a library that plugs into Ruby, with optional support for `YAML` and `JSON`,
 to optimize and cache expensive computations. See [How Does This Work](#how-does-this-work).
@@ -41,7 +41,7 @@ getting progressively slower, this is almost certainly the cause.**
 It's technically possible to simply specify `gem 'bootsnap', require: 'bootsnap/setup'`, but it's
 important to load Bootsnap as early as possible to get maximum performance improvement.
 
-You can see how this require works [here](https://github.com/Shopify/bootsnap/blob/main/lib/bootsnap/setup.rb).
+You can see how this require works [here](https://github.com/rails/bootsnap/blob/main/lib/bootsnap/setup.rb).
 
 If you are not using Rails, or if you are but want more control over things, add this to your
 application setup immediately after `require 'bundler/setup'` (i.e. as early as possible: the sooner
@@ -63,7 +63,7 @@ Bootsnap.setup(
 ```
 
 **Protip:** You can replace `require 'bootsnap'` with `BootLib::Require.from_gem('bootsnap',
-'bootsnap')` using [this trick](https://github.com/Shopify/bootsnap/wiki/Bootlib::Require). This
+'bootsnap')` using [this trick](https://github.com/rails/bootsnap/wiki/Bootlib::Require). This
 will help optimize boot time further if you have an extremely large `$LOAD_PATH`.
 
 Note: Bootsnap and [Spring](https://github.com/rails/spring) are orthogonal tools. While Bootsnap
@@ -170,7 +170,7 @@ The only directories considered "stable" are things under the Ruby install prefi
 "volatile".
 
 In addition to the [`Bootsnap::LoadPathCache::Cache`
-source](https://github.com/Shopify/bootsnap/blob/main/lib/bootsnap/load_path_cache/cache.rb),
+source](https://github.com/rails/bootsnap/blob/main/lib/bootsnap/load_path_cache/cache.rb),
 this diagram may help clarify how entry resolution works:
 
 ![How path searching works](https://cloud.githubusercontent.com/assets/3074765/25388270/670b5652-299b-11e7-87fb-975647f68981.png)
@@ -338,7 +338,7 @@ $ bundle exec bootsnap precompile --gemfile app/ lib/ config/
 
 ### QEMU environments
 
-When building cross-platform Docker images, QEMU is often used for emulation and can be the source of a limitation that causes forked processes to hang. While Bootsnap includes automatic detection for this issue (as of [PR #501](https://github.com/Shopify/bootsnap/pull/501)), the detection may not always be sufficient.
+When building cross-platform Docker images, QEMU is often used for emulation and can be the source of a limitation that causes forked processes to hang. While Bootsnap includes automatic detection for this issue (as of [PR #501](https://github.com/rails/bootsnap/pull/501)), the detection may not always be sufficient.
 
 If you encounter hangs during precompilation in QEMU-based environments (such as when using Docker buildx for cross-platform builds), you can work around this by disabling parallelization with the `-j 0` option:
 
@@ -346,7 +346,7 @@ If you encounter hangs during precompilation in QEMU-based environments (such as
 $ bundle exec bootsnap precompile -j 0 --gemfile app/ lib/ config/
 ```
 
-See [Issue #495](https://github.com/Shopify/bootsnap/issues/495) for more details about this QEMU-related issue.
+See [Issue #495](https://github.com/rails/bootsnap/issues/495) for more details about this QEMU-related issue.
 
 ## When not to use Bootsnap
 

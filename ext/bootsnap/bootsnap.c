@@ -23,7 +23,7 @@
 
 #ifdef __APPLE__
   // The symbol is present, however not in the headers
-  // See: https://github.com/Shopify/bootsnap/issues/470
+  // See: https://github.com/rails/bootsnap/issues/470
   extern int fdatasync(int);
 #endif
 

@@ -105,7 +105,7 @@
 
 * Get rid of the `Kernel.require_relative` decorator by resolving `$LOAD_PATH` members to their real path.
   This way we handle symlinks in `$LOAD_PATH` much more efficiently. See #402 for the detailed explanation.
-  
+
 * Drop support for Ruby 2.3 (to allow getting rid of the `Kernel.require_relative` decorator).
 
 # 1.10.3
@@ -231,7 +231,7 @@
 * Adds an instrumentation API to monitor cache misses.
 * Allow to control the behavior of `require 'bootsnap/setup'` using environment variables.
 * Deprecate the `disable_trace` option.
-* Deprecate the `ActiveSupport::Dependencies` (AKA Classic autoloader) integration. (#344) 
+* Deprecate the `ActiveSupport::Dependencies` (AKA Classic autoloader) integration. (#344)
 
 # 1.6.0
 
@@ -251,12 +251,12 @@
 
 # 1.4.9
 
-* [Windows support](https://github.com/Shopify/bootsnap/pull/319)
-* [Fix potential crash](https://github.com/Shopify/bootsnap/pull/322)
+* [Windows support](https://github.com/rails/bootsnap/pull/319)
+* [Fix potential crash](https://github.com/rails/bootsnap/pull/322)
 
 # 1.4.8
 
-* [Prevent FallbackScan from polluting exception cause](https://github.com/Shopify/bootsnap/pull/314)
+* [Prevent FallbackScan from polluting exception cause](https://github.com/rails/bootsnap/pull/314)
 
 # 1.4.7
 
@@ -269,7 +269,7 @@
   required if a different file with the same name was already being required
 
   Example:
-  
+
       require 'foo'
       require 'foo.en'
 
@@ -323,7 +323,7 @@
 
 # 1.3.0
 
-* Handle cases where load path entries are symlinked (https://github.com/Shopify/bootsnap/pull/136)
+* Handle cases where load path entries are symlinked (https://github.com/rails/bootsnap/pull/136)
 
 # 1.2.1
 

@@ -59,7 +59,7 @@ module Bootsnap
         def fork_defunct?
           return true unless ::Process.respond_to?(:fork)
 
-          # Ref: https://github.com/Shopify/bootsnap/issues/495
+          # Ref: https://github.com/rails/bootsnap/issues/495
           # The second forked process will hang on some QEMU environments
           r, w = IO.pipe
           pids = 2.times.map do

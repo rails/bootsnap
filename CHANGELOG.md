@@ -1,5 +1,7 @@
 # Unreleased
 
+* Remove JSON parsing cache. Recent versions of the `json` gem are as fast as `msgpack` if not faster.
+
 # 1.18.6
 
 * Fix cgroup CPU limits detection in CLI.

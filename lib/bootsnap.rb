@@ -54,8 +54,12 @@ module Bootsnap
       revalidation: false,
       compile_cache_iseq: true,
       compile_cache_yaml: true,
-      compile_cache_json: true
+      compile_cache_json: (compile_cache_json_unset = true)
     )
+      unless compile_cache_json_unset
+        warn("Bootsnap.setup `compile_cache_json` argument is deprecated and has no effect")
+      end
+
       if load_path_cache
         Bootsnap::LoadPathCache.setup(
           cache_path: "#{cache_dir}/bootsnap/load-path-cache",
@@ -69,7 +73,6 @@ module Bootsnap
         cache_dir: "#{cache_dir}/bootsnap/compile-cache",
         iseq: compile_cache_iseq,
         yaml: compile_cache_yaml,
-        json: compile_cache_json,
         readonly: readonly,
         revalidation: revalidation,
       )
@@ -115,7 +118,6 @@ module Bootsnap
           load_path_cache: enabled?("BOOTSNAP_LOAD_PATH_CACHE"),
           compile_cache_iseq: enabled?("BOOTSNAP_COMPILE_CACHE"),
           compile_cache_yaml: enabled?("BOOTSNAP_COMPILE_CACHE"),
-          compile_cache_json: enabled?("BOOTSNAP_COMPILE_CACHE"),
           readonly: bool_env("BOOTSNAP_READONLY"),
           revalidation: bool_env("BOOTSNAP_REVALIDATE"),
           ignore_directories: ignore_directories,

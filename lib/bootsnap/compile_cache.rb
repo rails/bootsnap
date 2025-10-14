@@ -9,7 +9,11 @@ module Bootsnap
 
     Error = Class.new(StandardError)
 
-    def self.setup(cache_dir:, iseq:, yaml:, json:, readonly: false, revalidation: false)
+    def self.setup(cache_dir:, iseq:, yaml:, json: (json_unset = true), readonly: false, revalidation: false)
+      unless json_unset
+        warn("Bootsnap::CompileCache.setup `json` argument is deprecated and has no effect")
+      end
+
       if iseq
         if supported?
           require_relative "compile_cache/iseq"
@@ -25,15 +29,6 @@ module Bootsnap
           Bootsnap::CompileCache::YAML.install!(cache_dir)
         elsif $VERBOSE
           warn("[bootsnap/setup] YAML parsing caching is not supported on this implementation of Ruby")
-        end
-      end
-
-      if json
-        if supported?
-          require_relative "compile_cache/json"
-          Bootsnap::CompileCache::JSON.install!(cache_dir)
-        elsif $VERBOSE
-          warn("[bootsnap/setup] JSON parsing caching is not supported on this implementation of Ruby")
         end
       end
 

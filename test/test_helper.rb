@@ -9,7 +9,6 @@ end
 require "bundler/setup"
 require "bootsnap"
 require "bootsnap/compile_cache/yaml"
-require "bootsnap/compile_cache/json"
 
 require "tmpdir"
 require "fileutils"
@@ -18,7 +17,7 @@ require "minitest/autorun"
 require "mocha/minitest"
 
 cache_dir = File.expand_path("../tmp/bootsnap/compile-cache", __dir__)
-Bootsnap::CompileCache.setup(cache_dir: cache_dir, iseq: true, yaml: false, json: false)
+Bootsnap::CompileCache.setup(cache_dir: cache_dir, iseq: true, yaml: false)
 
 if GC.respond_to?(:verify_compaction_references)
   # This method was added in Ruby 3.0.0. Calling it this way asks the GC to
@@ -122,7 +121,6 @@ module TmpdirHelper
     if Bootsnap::CompileCache.supported?
       set_compile_cache_dir(:ISeq, @tmp_dir)
       set_compile_cache_dir(:YAML, @tmp_dir)
-      set_compile_cache_dir(:JSON, @tmp_dir)
     end
   end
 
@@ -134,7 +132,6 @@ module TmpdirHelper
     if Bootsnap::CompileCache.supported?
       restore_compile_cache_dir(:ISeq)
       restore_compile_cache_dir(:YAML)
-      restore_compile_cache_dir(:JSON)
     end
   end
 

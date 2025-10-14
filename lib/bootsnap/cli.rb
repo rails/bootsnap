@@ -20,7 +20,7 @@ module Bootsnap
 
     attr_reader :cache_dir, :argv
 
-    attr_accessor :compile_gemfile, :exclude, :verbose, :iseq, :yaml, :json, :jobs
+    attr_accessor :compile_gemfile, :exclude, :verbose, :iseq, :yaml, :jobs
 
     def initialize(argv)
       @argv = argv
@@ -31,7 +31,6 @@ module Bootsnap
       self.jobs = nil
       self.iseq = true
       self.yaml = true
-      self.json = true
     end
 
     def precompile_command(*sources)
@@ -42,21 +41,18 @@ module Bootsnap
           cache_dir: cache_dir,
           iseq: iseq,
           yaml: yaml,
-          json: json,
           revalidation: true,
         )
 
         @work_pool = WorkerPool.create(size: jobs, jobs: {
           ruby: method(:precompile_ruby),
           yaml: method(:precompile_yaml),
-          json: method(:precompile_json),
         })
         @work_pool.spawn
 
         main_sources = sources.map { |d| File.expand_path(d) }
         precompile_ruby_files(main_sources)
         precompile_yaml_files(main_sources)
-        precompile_json_files(main_sources)
 
         if compile_gemfile
           # Gems that include JSON or YAML files usually don't put them in `lib/`.
@@ -70,7 +66,6 @@ module Bootsnap
 
           precompile_ruby_files(gem_paths, exclude: gem_exclude)
           precompile_yaml_files(gem_paths, exclude: gem_exclude)
-          precompile_json_files(gem_paths, exclude: gem_exclude)
         end
 
         if (exitstatus = @work_pool.shutdown)
@@ -141,29 +136,6 @@ module Bootsnap
       Array(yaml_files).each do |yaml_file|
         if CompileCache::YAML.precompile(yaml_file) && verbose
           $stderr.puts(yaml_file)
-        end
-      end
-    end
-
-    def precompile_json_files(load_paths, exclude: self.exclude)
-      return unless json
-
-      load_paths.each do |path|
-        if !exclude || !exclude.match?(path)
-          list_files(path, "**/*.json").each do |json_file|
-            # We ignore hidden files to not match the various .config.json files
-            if !File.basename(json_file).start_with?(".") && (!exclude || !exclude.match?(json_file))
-              @work_pool.push(:json, json_file)
-            end
-          end
-        end
-      end
-    end
-
-    def precompile_json(*json_files)
-      Array(json_files).each do |json_file|
-        if CompileCache::JSON.precompile(json_file) && verbose
-          $stderr.puts(json_file)
         end
       end
     end
@@ -276,9 +248,9 @@ module Bootsnap
         opts.on("--no-yaml", help) { self.yaml = false }
 
         help = <<~HELP
-          Disable JSON precompilation.
+          Disable JSON precompilation. Deprecated.
         HELP
-        opts.on("--no-json", help) { self.json = false }
+        opts.on("--no-json", help) { $stderr.puts("The --no-json option is deprecated and now a noop.") }
       end
     end
   end

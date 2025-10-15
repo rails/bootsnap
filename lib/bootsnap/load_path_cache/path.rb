@@ -22,7 +22,11 @@ module Bootsnap
       attr_reader(:path)
 
       def initialize(path, real: false)
-        @path = path.to_s.freeze
+        @path = path.to_s
+        if @path.encoding == Encoding::ASCII_8BIT
+          @path = @path.dup.force_encoding('UTF-8')
+        end
+        @path.freeze
         @real = real
       end
 

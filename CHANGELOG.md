@@ -1,5 +1,7 @@
 # Unreleased
 
+# 1.19.0
+
 * Remove JSON parsing cache. Recent versions of the `json` gem are as fast as `msgpack` if not faster.
 
 # 1.18.6

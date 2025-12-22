@@ -17,4 +17,5 @@ gem "mocha"
 
 group :development do
   gem "rubocop", "~> 1.50.2" # Ruby 2.6 support
+  gem "base64"
 end

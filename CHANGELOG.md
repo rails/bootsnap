@@ -1,5 +1,7 @@
 # Unreleased
 
+* Optimized load path scanning with a C extension. Should be about 2x faster on supported platforms.
+
 # 1.19.0
 
 * Remove JSON parsing cache. Recent versions of the `json` gem are as fast as `msgpack` if not faster.

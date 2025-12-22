@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #ifdef __APPLE__
   // The symbol is present, however not in the headers
@@ -150,6 +151,84 @@ bs_rb_get_path(VALUE self, VALUE fname)
     return rb_get_path(fname);
 }
 
+#ifdef HAVE_FSTATAT
+static VALUE
+bs_rb_scan_dir(VALUE self, VALUE abspath)
+{
+    Check_Type(abspath, T_STRING);
+
+    DIR *dirp = opendir(RSTRING_PTR(abspath));
+
+    VALUE dirs = rb_ary_new();
+    VALUE requirables = rb_ary_new();
+    VALUE result = rb_ary_new_from_args(2, requirables, dirs);
+
+    if (dirp == NULL) {
+        if (errno == ENOTDIR || errno == ENOENT) {
+            return result;
+        }
+        rb_sys_fail("opendir");
+        return Qundef;
+    }
+
+    struct dirent *entry;
+    struct stat st;
+    int dfd = -1;
+
+    errno = 0;
+    while ((entry = readdir(dirp))) {
+        if (entry->d_name[0] == '.') continue;
+
+        if (RB_UNLIKELY(entry->d_type == DT_UNKNOWN || entry->d_type == DT_LNK)) {
+            // Note: the original implementation of LoadPathCache did follow symlink.
+            // So this is replicated here, but I'm not sure it's a good idea.
+            if (dfd < 0) {
+                dfd = dirfd(dirp);
+                if (dfd < 0) {
+                    rb_sys_fail("dirfd");
+                    return Qundef;
+                }
+            }
+
+            if (fstatat(dfd, entry->d_name, &st, 0)) {
+                rb_sys_fail("fstatat");
+                return Qundef;
+            }
+
+            if (S_ISREG(st.st_mode)) {
+                entry->d_type = DT_REG;
+            } else if (S_ISDIR(st.st_mode)) {
+                entry->d_type = DT_DIR;
+            }
+        }
+
+        if (entry->d_type == DT_DIR) {
+            rb_ary_push(dirs, rb_utf8_str_new_cstr(entry->d_name));
+            continue;
+        } else if (entry->d_type == DT_REG) {
+            size_t len = strlen(entry->d_name);
+            bool is_requirable = (
+                // Comparing 4B allows compiler to optimize this into a single 32b integer comparison.
+                (len > 3 && memcmp(entry->d_name + (len - 3), ".rb", 4) == 0)
+                || (len > DLEXT_MAXLEN && memcmp(entry->d_name + (len - DLEXT_MAXLEN), DLEXT, DLEXT_MAXLEN + 1) == 0)
+#ifdef DLEXT2
+                || (len > DLEXT2_MAXLEN && memcmp(entry->d_name + (len - DLEXT2_MAXLEN), DLEXT2, DLEXT2_MAXLEN + 1) == 0)
+#endif
+            );
+            if (is_requirable) {
+                rb_ary_push(requirables, rb_utf8_str_new(entry->d_name, len));
+            }
+        }
+    }
+
+    if (closedir(dirp)) {
+        rb_sys_fail("closedir");
+        return Qundef;
+    }
+    return result;
+}
+#endif
+
 /*
  * Ruby C extensions are initialized by calling Init_<extname>.
  *
@@ -163,6 +242,13 @@ Init_bootsnap(void)
   rb_mBootsnap = rb_define_module("Bootsnap");
 
   rb_define_singleton_method(rb_mBootsnap, "rb_get_path", bs_rb_get_path, 1);
+
+#ifdef HAVE_FSTATAT
+  VALUE rb_mBootsnap_LoadPathCache = rb_define_module_under(rb_mBootsnap, "LoadPathCache");
+  VALUE rb_mBootsnap_LoadPathCache_Native = rb_define_module_under(rb_mBootsnap_LoadPathCache, "Native");
+
+  rb_define_singleton_method(rb_mBootsnap_LoadPathCache_Native, "scan_dir", bs_rb_scan_dir, 1);
+#endif
 
   VALUE rb_mBootsnap_CompileCache = rb_define_module_under(rb_mBootsnap, "CompileCache");
   rb_mBootsnap_CompileCache_Native = rb_define_module_under(rb_mBootsnap_CompileCache, "Native");

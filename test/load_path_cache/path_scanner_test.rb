@@ -27,17 +27,16 @@ module Bootsnap
           FileUtils.ln_s("#{dir}/support/h", "#{dir}/ruby/h")
           FileUtils.ln_s("#{dir}/support/l/m", "#{dir}/ruby/l/m")
 
-          entries, dirs = PathScanner.call("#{dir}/ruby")
+          entries = PathScanner.call("#{dir}/ruby")
           assert_equal(["a/g.rb", "d.rb", "e.#{DLEXT}", "h/i/k.rb", "h/j.rb", "l/m/n.rb"], entries.sort)
-          assert_equal(["a", "b", "b/c", "h", "h/i", "l", "l/m"], dirs.sort)
         end
       end
 
       def test_scan_missing_or_invalid_dir
         Dir.mktmpdir do |dir|
-          assert_equal [[], []], PathScanner.call("#{dir}/does/not/exist")
+          assert_equal [], PathScanner.call("#{dir}/does/not/exist")
           File.write("#{dir}/file", "")
-          assert_equal [[], []], PathScanner.call("#{dir}/file")
+          assert_equal [], PathScanner.call("#{dir}/file")
         end
       end
     end

@@ -56,48 +56,48 @@ module Bootsnap
 
       def test_volatile_cache_valid_when_mtime_has_not_changed
         with_caching_fixtures do |dir, _a, _a_b, _a_b_c|
-          entries, dirs = PathScanner.call(dir)
+          entries = PathScanner.call(dir)
           path = Path.new(dir) # volatile, since it'll be in /tmp
 
-          @cache.expects(:get).with(path.expanded_path).returns([100, entries, dirs])
+          @cache.expects(:get).with(path.expanded_path).returns([100, entries])
 
-          path.entries_and_dirs(@cache)
+          path.entries(@cache)
         end
       end
 
       def test_volatile_cache_invalid_when_mtime_changed
         with_caching_fixtures do |dir, _a, a_b, _a_b_c|
-          entries, dirs = PathScanner.call(dir)
+          entries = PathScanner.call(dir)
           path = Path.new(dir) # volatile, since it'll be in /tmp
 
           FileUtils.touch(a_b, mtime: Time.at(101))
 
-          @cache.expects(:get).with(path.expanded_path).returns([100, entries, dirs])
-          @cache.expects(:set).with(path.expanded_path, [101, entries, dirs])
+          @cache.expects(:get).with(path.expanded_path).returns([100, entries])
+          @cache.expects(:set).with(path.expanded_path, [101, entries])
 
           # next read doesn't regen
-          @cache.expects(:get).with(path.expanded_path).returns([101, entries, dirs])
+          @cache.expects(:get).with(path.expanded_path).returns([101, entries])
 
-          path.entries_and_dirs(@cache)
-          path.entries_and_dirs(@cache)
+          path.entries(@cache)
+          path.entries(@cache)
         end
       end
 
       def test_volatile_cache_generated_when_missing
         with_caching_fixtures do |dir, _a, _a_b, _a_b_c|
-          entries, dirs = PathScanner.call(dir)
+          entries = PathScanner.call(dir)
           path = Path.new(dir) # volatile, since it'll be in /tmp
 
           @cache.expects(:get).with(path.expanded_path).returns(nil)
-          @cache.expects(:set).with(path.expanded_path, [100, entries, dirs])
+          @cache.expects(:set).with(path.expanded_path, [100, entries])
 
-          path.entries_and_dirs(@cache)
+          path.entries(@cache)
         end
       end
 
       def test_stable_cache_does_not_notice_when_mtime_changes
         with_caching_fixtures do |dir, _a, a_b, _a_b_c|
-          entries, dirs = PathScanner.call(dir)
+          entries = PathScanner.call(dir)
           path = Path.new(dir) # volatile, since it'll be in /tmp
           path.expects(:stable?).returns(true)
 
@@ -105,9 +105,9 @@ module Bootsnap
 
           # It's unfortunate that we're stubbing the impl of #fetch here.
           PathScanner.expects(:call).never
-          @cache.expects(:get).with(path.expanded_path).returns([100, entries, dirs])
+          @cache.expects(:get).with(path.expanded_path).returns([100, entries])
 
-          path.entries_and_dirs(@cache)
+          path.entries(@cache)
         end
       end
 

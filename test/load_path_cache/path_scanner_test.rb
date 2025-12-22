@@ -32,6 +32,14 @@ module Bootsnap
           assert_equal(["a", "b", "b/c", "h", "h/i", "l", "l/m"], dirs.sort)
         end
       end
+
+      def test_scan_missing_or_invalid_dir
+        Dir.mktmpdir do |dir|
+          assert_equal [[], []], PathScanner.call("#{dir}/does/not/exist")
+          File.write("#{dir}/file", "")
+          assert_equal [[], []], PathScanner.call("#{dir}/file")
+        end
+      end
     end
   end
 end

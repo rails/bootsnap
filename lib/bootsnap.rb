@@ -2,8 +2,8 @@
 
 require_relative "bootsnap/version"
 require_relative "bootsnap/bundler"
-require_relative "bootsnap/load_path_cache"
 require_relative "bootsnap/compile_cache"
+require_relative "bootsnap/load_path_cache"
 
 module Bootsnap
   InvalidConfiguration = Class.new(StandardError)

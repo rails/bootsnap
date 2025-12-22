@@ -11,7 +11,15 @@ module Bootsnap
         @development_mode = development_mode
         @store = store
         @mutex = Mutex.new
-        @path_obj = path_obj.map! { |f| PathScanner.os_path(File.exist?(f) ? File.realpath(f) : f.dup) }
+        @path_obj = path_obj.map! do |f|
+          if File.exist?(f)
+            File.realpath(f).freeze
+          elsif f.frozen?
+            f
+          else
+            f.dup.freeze
+          end
+        end
         @has_relative_paths = nil
         reinitialize
       end

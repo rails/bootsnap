@@ -6,8 +6,6 @@ module Bootsnap
   module LoadPathCache
     module PathScanner
       REQUIRABLE_EXTENSIONS = [DOT_RB] + DL_EXTENSIONS
-      NORMALIZE_NATIVE_EXTENSIONS = !DL_EXTENSIONS.include?(LoadPathCache::DOT_SO)
-      ALTERNATIVE_NATIVE_EXTENSIONS_PATTERN = /\.(o|bundle|dylib)\z/.freeze
 
       BUNDLE_PATH = if Bootsnap.bundler?
         (Bundler.bundle_path.cleanpath.to_s << LoadPathCache::SLASH).freeze
@@ -20,7 +18,7 @@ module Bootsnap
       class << self
         attr_accessor :ignored_directories
 
-        def call(path)
+        def ruby_call(path)
           path = File.expand_path(path.to_s).freeze
           return [[], []] unless File.directory?(path)
 
@@ -37,10 +35,10 @@ module Bootsnap
           requirables = []
           walk(path, nil) do |relative_path, absolute_path, is_directory|
             if is_directory
-              dirs << os_path(relative_path)
+              dirs << relative_path.freeze
               !contains_bundle_path || !absolute_path.start_with?(BUNDLE_PATH)
             elsif relative_path.end_with?(*REQUIRABLE_EXTENSIONS)
-              requirables << os_path(relative_path)
+              requirables << relative_path.freeze
             end
           end
           [requirables, dirs]
@@ -65,15 +63,55 @@ module Bootsnap
           end
         end
 
-        if RUBY_VERSION >= "3.1"
-          def os_path(path)
-            path.freeze
+        if RUBY_ENGINE == "ruby" && RUBY_PLATFORM.match?(/darwin|linux|bsd|mswin|mingw|cygwin/)
+          require "bootsnap/bootsnap"
+        end
+
+        if defined?(Native.scan_dir)
+          def native_call(root_path)
+            # NOTE: if https://bugs.ruby-lang.org/issues/21800 is accepted we should be able
+            # to have similar performance with pure Ruby
+
+            # If the bundle path is a descendent of this path, we do additional
+            # checks to prevent recursing into the bundle path as we recurse
+            # through this path. We don't want to scan the bundle path because
+            # anything useful in it will be present on other load path items.
+            #
+            # This can happen if, for example, the user adds '.' to the load path,
+            # and the bundle path is '.bundle'.
+            contains_bundle_path = BUNDLE_PATH.start_with?(root_path)
+
+            all_requirables, all_dirs = Native.scan_dir(root_path)
+            all_dirs.each(&:freeze)
+            all_requirables.each(&:freeze)
+
+            all_dirs.reject! do |dir|
+              ignored_directories.include?(dir) ||
+                (contains_bundle_path && dir.start_with?(BUNDLE_PATH))
+            end
+
+            queue = all_dirs.dup
+
+            while (path = queue.pop)
+              requirables, dirs = Native.scan_dir(File.join(root_path, path))
+              dirs.reject! { |dir| ignored_directories.include?(dir) }
+              dirs.map! { |f| File.join(path, f).freeze }
+              requirables.map! { |f| File.join(path, f).freeze }
+
+              if contains_bundle_path
+                dirs.reject! { |dir| dir.start_with?(BUNDLE_PATH) }
+              end
+
+              all_dirs.concat(dirs)
+              all_requirables.concat(requirables)
+              queue.concat(dirs)
+            end
+
+            [all_requirables, all_dirs]
           end
+          alias_method :call, :native_call
         else
-          def os_path(path)
-            path.force_encoding(Encoding::US_ASCII) if path.ascii_only?
-            path.freeze
-          end
+          alias_method :call, :ruby_call
         end
       end
     end

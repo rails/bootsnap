@@ -54,29 +54,28 @@ module Bootsnap
         !path.start_with?(SLASH)
       end
 
-      # Return a list of all the requirable files and all of the subdirectories
-      # of this +Path+.
-      def entries_and_dirs(store)
+      # Return a list of all the requirable files of this +Path+.
+      def entries(store)
         if stable?
           # the cached_mtime field is unused for 'stable' paths, but is
           # set to zero anyway, just in case we change the stability heuristics.
-          _, entries, dirs = store.get(expanded_path)
-          return [entries, dirs] if entries # cache hit
+          _, entries, = store.get(expanded_path)
+          return entries if entries # cache hit
 
-          entries, dirs = scan!
-          store.set(expanded_path, [0, entries, dirs])
-          return [entries, dirs]
+          entries = PathScanner.call(expanded_path)
+          store.set(expanded_path, [0, entries])
+          return entries
         end
 
-        cached_mtime, entries, dirs = store.get(expanded_path)
+        cached_mtime, entries = store.get(expanded_path)
 
-        current_mtime = latest_mtime(expanded_path, dirs || [])
-        return [[], []]        if current_mtime == -1 # path does not exist
-        return [entries, dirs] if cached_mtime == current_mtime
+        current_mtime = latest_mtime(expanded_path, entries || [])
+        return [] if current_mtime == -1 # path does not exist
+        return entries if cached_mtime == current_mtime
 
-        entries, dirs = scan!
-        store.set(expanded_path, [current_mtime, entries, dirs])
-        [entries, dirs]
+        entries = PathScanner.call(expanded_path)
+        store.set(expanded_path, [current_mtime, entries])
+        entries
       end
 
       def expanded_path
@@ -89,23 +88,31 @@ module Bootsnap
 
       private
 
-      def scan! # (expensive) returns [entries, dirs]
-        PathScanner.call(expanded_path)
-      end
-
       # last time a directory was modified in this subtree. +dirs+ should be a
       # list of relative paths to directories under +path+. e.g. for /a/b and
       # /a/b/c, pass ('/a/b', ['c'])
-      def latest_mtime(path, dirs)
-        max = -1
-        ["", *dirs].each do |dir|
-          curr = begin
-            File.mtime("#{path}/#{dir}").to_i
-                 rescue Errno::ENOENT, Errno::ENOTDIR, Errno::EINVAL
-                   -1
-          end
-          max = curr if curr > max
+      def latest_mtime(root_path, entries)
+        max = begin
+          File.mtime(root_path).to_i
+        rescue Errno::ENOENT, Errno::ENOTDIR, Errno::EINVAL
+          -1
         end
+
+        visited = {"." => true}
+
+        entries.each do |relpath|
+          dirname = File.dirname(relpath)
+          visited[dirname] ||= begin
+            begin
+              current = File.mtime(File.join(root_path, dirname)).to_i
+              max = current if current > max
+            rescue Errno::ENOENT, Errno::ENOTDIR, Errno::EINVAL
+              # ignore
+            end
+            true
+          end
+        end
+
         max
       end
 

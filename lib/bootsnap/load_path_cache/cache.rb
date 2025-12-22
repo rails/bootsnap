@@ -24,14 +24,6 @@ module Bootsnap
         reinitialize
       end
 
-      # What is the path item that contains the dir as child?
-      # e.g. given "/a/b/c/d" exists, and the path is ["/a/b"], load_dir("c/d")
-      # is "/a/b".
-      def load_dir(dir)
-        reinitialize if stale?
-        @mutex.synchronize { @dirs[dir] }
-      end
-
       TRUFFLERUBY_LIB_DIR_PREFIX = if RUBY_ENGINE == "truffleruby"
         "#{File.join(RbConfig::CONFIG['libdir'], 'truffle')}#{File::SEPARATOR}"
       end
@@ -132,7 +124,6 @@ module Bootsnap
           @path_obj = path_obj
           ChangeObserver.register(@path_obj, self)
           @index = {}
-          @dirs = {}
           @generated_at = now
           push_paths_locked(*@path_obj)
         end
@@ -160,9 +151,8 @@ module Bootsnap
             p = p.to_realpath
 
             expanded_path = p.expanded_path
-            entries, dirs = p.entries_and_dirs(@store)
+            entries = p.entries(@store)
             # push -> low precedence -> set only if unset
-            dirs.each    { |dir| @dirs[dir] ||= path }
             entries.each { |rel| @index[rel] ||= expanded_path }
           end
         end
@@ -177,9 +167,8 @@ module Bootsnap
             p = p.to_realpath
 
             expanded_path = p.expanded_path
-            entries, dirs = p.entries_and_dirs(@store)
+            entries = p.entries(@store)
             # unshift -> high precedence -> unconditional set
-            dirs.each    { |dir| @dirs[dir]  = path }
             entries.each { |rel| @index[rel] = expanded_path }
           end
         end

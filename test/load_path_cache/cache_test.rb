@@ -91,13 +91,6 @@ module Bootsnap
         assert_equal("#{@dir1}/conflict.rb", cache.find("conflict"))
       end
 
-      def test_directory_caching
-        cache = Cache.new(NullCache, [@dir1])
-        assert_equal(@dir1, cache.load_dir("foo"))
-        assert_equal(@dir1, cache.load_dir("foo/bar"))
-        assert_nil(cache.load_dir("bar"))
-      end
-
       def test_extension_permutations
         cache = Cache.new(NullCache, [@dir1])
         assert_equal("#{@dir1}/dl#{DLEXT}", cache.find("dl"))

@@ -20,7 +20,7 @@ module Bootsnap
 
         def ruby_call(path)
           path = File.expand_path(path.to_s).freeze
-          return [[], []] unless File.directory?(path)
+          return [] unless File.directory?(path)
 
           # If the bundle path is a descendent of this path, we do additional
           # checks to prevent recursing into the bundle path as we recurse
@@ -31,17 +31,15 @@ module Bootsnap
           # and the bundle path is '.bundle'.
           contains_bundle_path = BUNDLE_PATH.start_with?(path)
 
-          dirs = []
           requirables = []
           walk(path, nil) do |relative_path, absolute_path, is_directory|
             if is_directory
-              dirs << relative_path.freeze
               !contains_bundle_path || !absolute_path.start_with?(BUNDLE_PATH)
             elsif relative_path.end_with?(*REQUIRABLE_EXTENSIONS)
               requirables << relative_path.freeze
             end
           end
-          [requirables, dirs]
+          requirables
         end
 
         def walk(absolute_dir_path, relative_dir_path, &block)
@@ -81,16 +79,13 @@ module Bootsnap
             # and the bundle path is '.bundle'.
             contains_bundle_path = BUNDLE_PATH.start_with?(root_path)
 
-            all_requirables, all_dirs = Native.scan_dir(root_path)
-            all_dirs.each(&:freeze)
+            all_requirables, queue = Native.scan_dir(root_path)
             all_requirables.each(&:freeze)
 
-            all_dirs.reject! do |dir|
+            queue.reject! do |dir|
               ignored_directories.include?(dir) ||
                 (contains_bundle_path && dir.start_with?(BUNDLE_PATH))
             end
-
-            queue = all_dirs.dup
 
             while (path = queue.pop)
               requirables, dirs = Native.scan_dir(File.join(root_path, path))
@@ -102,12 +97,11 @@ module Bootsnap
                 dirs.reject! { |dir| dir.start_with?(BUNDLE_PATH) }
               end
 
-              all_dirs.concat(dirs)
               all_requirables.concat(requirables)
               queue.concat(dirs)
             end
 
-            [all_requirables, all_dirs]
+            all_requirables
           end
           alias_method :call, :native_call
         else

@@ -11,7 +11,6 @@
  * here.
  */
 
-#include "bootsnap.h"
 #include "ruby.h"
 #include <stdint.h>
 #include <stdbool.h>
@@ -96,7 +95,6 @@ static mode_t current_umask;
 
 /* Bootsnap::CompileCache::{Native, Uncompilable} */
 static VALUE rb_mBootsnap;
-static VALUE rb_mBootsnap_CompileCache;
 static VALUE rb_mBootsnap_CompileCache_Native;
 static VALUE rb_cBootsnap_CompileCache_UNCOMPILABLE;
 static ID instrumentation_method;
@@ -166,7 +164,7 @@ Init_bootsnap(void)
 
   rb_define_singleton_method(rb_mBootsnap, "rb_get_path", bs_rb_get_path, 1);
 
-  rb_mBootsnap_CompileCache = rb_define_module_under(rb_mBootsnap, "CompileCache");
+  VALUE rb_mBootsnap_CompileCache = rb_define_module_under(rb_mBootsnap, "CompileCache");
   rb_mBootsnap_CompileCache_Native = rb_define_module_under(rb_mBootsnap_CompileCache, "Native");
   rb_cBootsnap_CompileCache_UNCOMPILABLE = rb_const_get(rb_mBootsnap_CompileCache, rb_intern("UNCOMPILABLE"));
   rb_global_variable(&rb_cBootsnap_CompileCache_UNCOMPILABLE);

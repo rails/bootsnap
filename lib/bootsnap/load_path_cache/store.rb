@@ -8,7 +8,7 @@ module Bootsnap
   module LoadPathCache
     class Store
       VERSION_KEY = "__bootsnap_ruby_version__"
-      CURRENT_VERSION = "#{RUBY_REVISION}-#{RUBY_PLATFORM}".freeze # rubocop:disable Style/RedundantFreeze
+      CURRENT_VERSION = "#{VERSION}-#{RUBY_REVISION}-#{RUBY_PLATFORM}".freeze # rubocop:disable Style/RedundantFreeze
 
       NestedTransactionError = Class.new(StandardError)
       SetOutsideTransactionNotAllowed = Class.new(StandardError)

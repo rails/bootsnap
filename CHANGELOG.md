@@ -1,6 +1,9 @@
 # Unreleased
 
+# 1.20.1
+
 * Handle broken symlinks in load path scanning code.
+  Should fix `Errno::ENOENT fstatat` issues some users have encountered after upgrading to 1.20.0.
 
 # 1.20.0
 

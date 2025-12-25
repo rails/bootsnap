@@ -32,6 +32,14 @@ module Bootsnap
         end
       end
 
+      def test_scan_broken_symlink
+        Dir.mktmpdir do |dir|
+          File.symlink("/does/not/exist", "#{dir}/dir_link")
+          assert_equal [], PathScanner.call(dir)
+          assert_equal [], PathScanner.call("#{dir}/dir_link")
+        end
+      end
+
       def test_scan_missing_or_invalid_dir
         Dir.mktmpdir do |dir|
           assert_equal [], PathScanner.call("#{dir}/does/not/exist")

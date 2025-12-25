@@ -1,5 +1,7 @@
 # Unreleased
 
+* Handle broken symlinks in load path scanning code.
+
 # 1.20.0
 
 * Optimized load path scanning with a C extension. Should be about 2x faster on supported platforms.

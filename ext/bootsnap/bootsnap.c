@@ -191,6 +191,10 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
             }
 
             if (fstatat(dfd, entry->d_name, &st, 0)) {
+                if (errno == ENOENT) {
+                    // Broken symlinK
+                    continue;
+                }
                 rb_sys_fail("fstatat");
                 return Qundef;
             }

@@ -29,7 +29,11 @@ class CompileCacheTest < Minitest::Test
       path = Help.set_file("a.rb", "a = a = 3", 100)
       load(path)
     ensure
-      Coverage.result
+      if Coverage.respond_to?(:running?)
+        Coverage.result if Coverage.running?
+      else
+        Coverage.result
+      end
     end
   end
 

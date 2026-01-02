@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <stdio.h>
 
 #ifdef __APPLE__
   // The symbol is present, however not in the headers
@@ -48,7 +49,10 @@ static void
 bs_syserr_fail(const char *message)
 {
   int err = errno;
-  if (err == 0) err = EIO;
+  if (err == 0) {
+    fprintf(stderr, "[bootsnap] %s failed without setting errno\n", message);
+    err = EIO;
+  }
   rb_syserr_fail(err, message);
 }
 

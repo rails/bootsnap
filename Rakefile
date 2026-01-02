@@ -3,6 +3,12 @@
 require "rake/extensiontask"
 require "bundler/gem_tasks"
 
+if Rake.application.top_level_tasks.empty? ||
+   Rake.application.top_level_tasks.include?("default") ||
+   Rake.application.top_level_tasks.include?("test")
+  ENV["BOOTSNAP_TESTING"] ||= "1"
+end
+
 gemspec = Gem::Specification.load("bootsnap.gemspec")
 Rake::ExtensionTask.new do |ext|
   ext.name = "bootsnap"

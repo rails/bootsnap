@@ -44,6 +44,14 @@
 #define RB_UNLIKELY(x) (x)
 #endif
 
+static void
+bs_syserr_fail(const char *message)
+{
+  int err = errno;
+  if (err == 0) err = EIO;
+  rb_syserr_fail(err, message);
+}
+
 /*
  * An instance of this key is written as the first 64 bytes of each cache file.
  * The mtime and size members track whether the file contents have changed, and
@@ -167,7 +175,7 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
         if (errno == ENOTDIR || errno == ENOENT) {
             return result;
         }
-        rb_sys_fail("opendir");
+        bs_syserr_fail("opendir");
         return Qundef;
     }
 
@@ -185,7 +193,7 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
             if (dfd < 0) {
                 dfd = dirfd(dirp);
                 if (dfd < 0) {
-                    rb_sys_fail("dirfd");
+                    bs_syserr_fail("dirfd");
                     return Qundef;
                 }
             }
@@ -195,7 +203,7 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
                     // Broken symlinK
                     continue;
                 }
-                rb_sys_fail("fstatat");
+                bs_syserr_fail("fstatat");
                 return Qundef;
             }
 
@@ -226,11 +234,21 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
     }
 
     if (closedir(dirp)) {
-        rb_sys_fail("closedir");
+        bs_syserr_fail("closedir");
         return Qundef;
     }
     return result;
 }
+
+#ifdef BOOTSNAP_TESTING
+static VALUE
+bs_rb_test_sys_fail_zero_errno(VALUE self)
+{
+    errno = 0;
+    bs_syserr_fail("bootsnap");
+    return Qundef;
+}
+#endif
 #endif
 
 /*
@@ -252,6 +270,9 @@ Init_bootsnap(void)
   VALUE rb_mBootsnap_LoadPathCache_Native = rb_define_module_under(rb_mBootsnap_LoadPathCache, "Native");
 
   rb_define_singleton_method(rb_mBootsnap_LoadPathCache_Native, "scan_dir", bs_rb_scan_dir, 1);
+#ifdef BOOTSNAP_TESTING
+  rb_define_singleton_method(rb_mBootsnap_LoadPathCache_Native, "__test_sys_fail_zero_errno", bs_rb_test_sys_fail_zero_errno, 0);
+#endif
 #endif
 
   VALUE rb_mBootsnap_CompileCache = rb_define_module_under(rb_mBootsnap, "CompileCache");

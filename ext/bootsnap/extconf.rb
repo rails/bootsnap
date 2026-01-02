@@ -6,6 +6,10 @@ if %w[ruby truffleruby].include?(RUBY_ENGINE)
   have_func "fdatasync", "unistd.h"
   have_func "fstatat", "sys/stat.h"
 
+  if ENV["BOOTSNAP_TESTING"] == "1"
+    $defs << "-DBOOTSNAP_TESTING"
+  end
+
   unless RUBY_PLATFORM.match?(/mswin|mingw|cygwin/)
     append_cppflags ["-D_GNU_SOURCE"] # Needed of O_NOATIME
   end

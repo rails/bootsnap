@@ -170,7 +170,9 @@ module Bootsnap
             unpacker = CompileCache::YAML.msgpack_factory.unpacker(kwargs)
             unpacker.feed(data)
             _safe_loaded = unpacker.unpack
-            unpacker.unpack
+            result = unpacker.unpack
+            data.clear
+            result
           end
 
           def input_to_output(data, kwargs)

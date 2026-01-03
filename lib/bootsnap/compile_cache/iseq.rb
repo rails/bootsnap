@@ -50,7 +50,9 @@ module Bootsnap
       end
 
       def self.storage_to_output(binary, _args)
-        RubyVM::InstructionSequence.load_from_binary(binary)
+        iseq = RubyVM::InstructionSequence.load_from_binary(binary)
+        binary.clear
+        iseq
       rescue RuntimeError => error
         if error.message == "broken binary format"
           $stderr.puts("[Bootsnap::CompileCache] warning: rejecting broken binary")

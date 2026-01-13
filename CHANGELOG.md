@@ -1,6 +1,9 @@
 # Unreleased
 
+# 1.21.0
+
 * Fix the `require` decorator to handle `Bootsnap.unload_cache!` being called.
+* Minor optimization: Eagerly clear cache buffers to appease the GC.
 
 # 1.20.1
 

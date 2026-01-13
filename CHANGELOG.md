@@ -1,5 +1,7 @@
 # Unreleased
 
+* Fix the `require` decorator to handle `Bootsnap.unload_cache!` being called.
+
 # 1.20.1
 
 * Handle broken symlinks in load path scanning code.

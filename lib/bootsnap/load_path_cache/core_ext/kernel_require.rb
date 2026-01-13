@@ -15,8 +15,11 @@ module Kernel
     if Bootsnap::LoadPathCache::FALLBACK_SCAN.equal?(resolved)
       if (cursor = Bootsnap::LoadPathCache.loaded_features_index.cursor(string_path))
         ret = require_without_bootsnap(path)
-        resolved = Bootsnap::LoadPathCache.loaded_features_index.identify(string_path, cursor)
-        Bootsnap::LoadPathCache.loaded_features_index.register(string_path, resolved)
+
+        # The file we required may have unloaded the cache
+        resolved = Bootsnap::LoadPathCache.loaded_features_index&.identify(string_path, cursor)
+        Bootsnap::LoadPathCache.loaded_features_index&.register(string_path, resolved)
+
         return ret
       else
         return require_without_bootsnap(path)
@@ -28,7 +31,9 @@ module Kernel
     else
       # Note that require registers to $LOADED_FEATURES while load does not.
       ret = require_without_bootsnap(resolved)
-      Bootsnap::LoadPathCache.loaded_features_index.register(string_path, resolved)
+
+      # The file we required may have unloaded the cache
+      Bootsnap::LoadPathCache.loaded_features_index&.register(string_path, resolved)
       return ret
     end
   end

@@ -32,6 +32,58 @@ module Bootsnap
       end
     end
 
+    def test_unload_cache_from_require_on_cache_hit
+      skip("Need a working Process.fork to test in isolation") unless Process.respond_to?(:fork)
+      begin
+        assert_nil LoadPathCache.load_path_cache
+        cache = Tempfile.new("cache")
+        pid = Process.fork do
+          LoadPathCache.setup(cache_path: cache.path, development_mode: true, ignore_directories: nil)
+          dir = File.realpath(Dir.mktmpdir)
+          $LOAD_PATH.push(dir)
+          path = "#{dir}/a.rb"
+          File.write(path, <<~RUBY)
+            Bootsnap.unload_cache!
+          RUBY
+
+          require(path)
+        end
+        _, status = Process.wait2(pid)
+        assert_predicate status, :success?
+      ensure
+        cache.close
+        cache.unlink
+      end
+    end
+
+    def test_unload_cache_from_require_on_cache_miss
+      skip("Need a working Process.fork to test in isolation") unless Process.respond_to?(:fork)
+      begin
+        assert_nil LoadPathCache.load_path_cache
+        cache = Tempfile.new("cache")
+        pid = Process.fork do
+          LoadPathCache.setup(cache_path: cache.path, development_mode: true, ignore_directories: nil)
+          dir = File.realpath(Dir.mktmpdir)
+          LoadPathCache.loaded_features_index.expects(:key?).returns(false)
+          LoadPathCache.load_path_cache.expects(:find).returns(LoadPathCache::FALLBACK_SCAN)
+          LoadPathCache.loaded_features_index.expects(:cursor).returns(12)
+
+          $LOAD_PATH.push(dir)
+          path = "#{dir}/a.rb"
+          File.write(path, <<~RUBY)
+            Bootsnap.unload_cache!
+          RUBY
+
+          require(path)
+        end
+        _, status = Process.wait2(pid)
+        assert_predicate status, :success?
+      ensure
+        cache.close
+        cache.unlink
+      end
+    end
+
     def test_load_static_libaries
       skip("Need a working Process.fork to test in isolation") unless Process.respond_to?(:fork)
       skip("Need some libraries to be compiled statically") unless RUBY_VERSION >= "3.3"

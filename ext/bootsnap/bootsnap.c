@@ -21,6 +21,10 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
+#ifndef RBIMPL_ATTR_NORETURN
+#define RBIMPL_ATTR_NORETURN()
+#endif
+
 #ifdef __APPLE__
   // The symbol is present, however not in the headers
   // See: https://github.com/rails/bootsnap/issues/470
@@ -152,6 +156,21 @@ bs_rb_get_path(VALUE self, VALUE fname)
 }
 
 #ifdef HAVE_FSTATAT
+
+RBIMPL_ATTR_NORETURN()
+static void
+bs_syserr_fail_path(const char *func_name, int n, VALUE path)
+{
+    rb_syserr_fail_str(n, rb_sprintf("%s @ %s", func_name, RSTRING_PTR(path)));
+}
+
+RBIMPL_ATTR_NORETURN()
+static void
+bs_syserr_fail_dir_entry(const char *func_name, int n, VALUE dir, const char *d_name)
+{
+    rb_syserr_fail_str(n, rb_sprintf("%s @ %s/%s", func_name, RSTRING_PTR(dir), d_name));
+}
+
 static VALUE
 bs_rb_scan_dir(VALUE self, VALUE abspath)
 {
@@ -167,7 +186,17 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
         if (errno == ENOTDIR || errno == ENOENT) {
             return result;
         }
-        rb_sys_fail("opendir");
+
+        // BUG: Some users reported a crash here because Ruby's syserr trigger
+        // a crash if called with `errno == 0`.
+        // The opendir spec is quite clear that if it returns NULL, then `errno` must
+        // be set, and yet here we are.
+        // So turning no errno into EINVAL, and from there I hope to get to the bottom of things.
+        if (errno == 0) {
+            errno = EINVAL;
+        }
+
+        bs_syserr_fail_path("opendir", errno, abspath);
         return Qundef;
     }
 
@@ -185,7 +214,9 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
             if (dfd < 0) {
                 dfd = dirfd(dirp);
                 if (dfd < 0) {
-                    rb_sys_fail("dirfd");
+                    int err = errno;
+                    closedir(dirp);
+                    bs_syserr_fail_path("dirfd", err, abspath);
                     return Qundef;
                 }
             }
@@ -193,9 +224,12 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
             if (fstatat(dfd, entry->d_name, &st, 0)) {
                 if (errno == ENOENT) {
                     // Broken symlinK
+                    errno = 0;
                     continue;
                 }
-                rb_sys_fail("fstatat");
+                int err = errno;
+                closedir(dirp);
+                bs_syserr_fail_dir_entry("fstatat", err, abspath, entry->d_name);
                 return Qundef;
             }
 
@@ -226,7 +260,7 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
     }
 
     if (closedir(dirp)) {
-        rb_sys_fail("closedir");
+        bs_syserr_fail_path("closedir", errno, abspath);
         return Qundef;
     }
     return result;

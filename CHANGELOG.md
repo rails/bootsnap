@@ -1,5 +1,10 @@
 # Unreleased
 
+# 1.21.1
+
+* Prevent a Ruby crash while scanning load path if `opendir` fails without setting `errno`.
+  According to the C spec this should not happen, but according to user reports, it did.
+
 # 1.21.0
 
 * Fix the `require` decorator to handle `Bootsnap.unload_cache!` being called.

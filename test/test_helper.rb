@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+ENV["BOOTSNAP_DEBUG"] = "1"
+
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 
 if Warning.respond_to?(:[]=)

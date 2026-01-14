@@ -167,6 +167,9 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
         if (errno == ENOTDIR || errno == ENOENT) {
             return result;
         }
+        if (errno == 0) {
+            rb_raise(rb_eRuntimeError, "opendir returned NULL but errno is 0");
+        }
         rb_sys_fail("opendir");
         return Qundef;
     }
@@ -185,6 +188,9 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
             if (dfd < 0) {
                 dfd = dirfd(dirp);
                 if (dfd < 0) {
+                    if (errno == 0) {
+                        rb_raise(rb_eRuntimeError, "dirfd returned < 0 but errno is 0");
+                    }
                     rb_sys_fail("dirfd");
                     return Qundef;
                 }
@@ -194,6 +200,10 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
                 if (errno == ENOENT) {
                     // Broken symlinK
                     continue;
+                }
+
+                if (errno == 0) {
+                    rb_raise(rb_eRuntimeError, "fstatat returned !0 but errno is 0");
                 }
                 rb_sys_fail("fstatat");
                 return Qundef;
@@ -226,6 +236,10 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
     }
 
     if (closedir(dirp)) {
+        if (errno == 0) {
+            rb_raise(rb_eRuntimeError, "closedir returned !0 but errno is 0");
+        }
+
         rb_sys_fail("closedir");
         return Qundef;
     }

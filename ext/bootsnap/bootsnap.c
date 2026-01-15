@@ -176,24 +176,14 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
 {
     Check_Type(abspath, T_STRING);
 
-    DIR *dirp = opendir(RSTRING_PTR(abspath));
-
     VALUE dirs = rb_ary_new();
     VALUE requirables = rb_ary_new();
     VALUE result = rb_ary_new_from_args(2, requirables, dirs);
 
+    DIR *dirp = opendir(RSTRING_PTR(abspath));
     if (dirp == NULL) {
         if (errno == ENOTDIR || errno == ENOENT) {
             return result;
-        }
-
-        // BUG: Some users reported a crash here because Ruby's syserr trigger
-        // a crash if called with `errno == 0`.
-        // The opendir spec is quite clear that if it returns NULL, then `errno` must
-        // be set, and yet here we are.
-        // So turning no errno into EINVAL, and from there I hope to get to the bottom of things.
-        if (errno == 0) {
-            errno = EINVAL;
         }
 
         bs_syserr_fail_path("opendir", errno, abspath);

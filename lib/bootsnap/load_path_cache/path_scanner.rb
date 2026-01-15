@@ -102,13 +102,6 @@ module Bootsnap
             end
 
             all_requirables
-          rescue SystemCallError => error
-            if ENV["BOOTSNAP_DEBUG"]
-              raise
-            else
-              Bootsnap.logger&.call("Unexpected error: #{error.class}: #{error.message}")
-              ruby_call(root_path)
-            end
           end
           alias_method :call, :native_call
         else

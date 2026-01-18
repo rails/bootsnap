@@ -154,6 +154,12 @@ module Bootsnap
       Bootsnap.default_setup
     end
 
+    def test_setup_appends_bootsnap_to_cache_dir
+      Bootsnap.setup(cache_dir: @tmp_dir)
+
+      assert_equal("#{@tmp_dir}/bootsnap", Bootsnap.cache_dir)
+    end
+
     def test_unload_cache
       Bootsnap.unload_cache!
     end

@@ -7,7 +7,7 @@ module Bootsnap
   InvalidConfiguration = Class.new(StandardError)
 
   class << self
-    attr_reader :logger
+    attr_reader :cache_dir, :logger
 
     def log_stats!
       stats = {hit: 0, revalidated: 0, miss: 0, stale: 0}
@@ -58,9 +58,11 @@ module Bootsnap
         warn("Bootsnap.setup `compile_cache_json` argument is deprecated and has no effect")
       end
 
+      @cache_dir = "#{cache_dir}/bootsnap"
+
       if load_path_cache
         Bootsnap::LoadPathCache.setup(
-          cache_path: "#{cache_dir}/bootsnap/load-path-cache",
+          cache_path: "#{@cache_dir}/load-path-cache",
           development_mode: development_mode,
           ignore_directories: ignore_directories,
           readonly: readonly,
@@ -68,7 +70,7 @@ module Bootsnap
       end
 
       Bootsnap::CompileCache.setup(
-        cache_dir: "#{cache_dir}/bootsnap/compile-cache",
+        cache_dir: "#{@cache_dir}/compile-cache",
         iseq: compile_cache_iseq,
         yaml: compile_cache_yaml,
         readonly: readonly,

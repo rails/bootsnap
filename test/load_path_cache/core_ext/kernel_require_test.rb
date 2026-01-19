@@ -27,8 +27,8 @@ module Bootsnap
         _, status = Process.wait2(pid)
         assert_predicate status, :success?
       ensure
-        cache.close
-        cache.unlink
+        cache&.close
+        cache&.unlink
       end
     end
 
@@ -51,8 +51,8 @@ module Bootsnap
         _, status = Process.wait2(pid)
         assert_predicate status, :success?
       ensure
-        cache.close
-        cache.unlink
+        cache&.close
+        cache&.unlink
       end
     end
 
@@ -79,8 +79,8 @@ module Bootsnap
         _, status = Process.wait2(pid)
         assert_predicate status, :success?
       ensure
-        cache.close
-        cache.unlink
+        cache&.close
+        cache&.unlink
       end
     end
 
@@ -98,8 +98,8 @@ module Bootsnap
         _, status = Process.wait2(pid)
         assert_predicate status, :success?
       ensure
-        cache.close
-        cache.unlink
+        cache&.close
+        cache&.unlink
       end
     end
   end

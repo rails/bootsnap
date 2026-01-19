@@ -154,6 +154,20 @@ module Bootsnap
       Bootsnap.default_setup
     end
 
+    def test_setup_appends_bootsnap_to_cache_dir
+      skip("Need a working Process.fork to test in isolation") unless Process.respond_to?(:fork)
+
+      pid = fork do
+        Bootsnap.setup(cache_dir: @tmp_dir)
+
+        assert_equal("#{@tmp_dir}/bootsnap", Bootsnap.cache_dir)
+      end
+      _, status = Process.waitpid2(pid)
+      assert_predicate status, :success?
+    ensure
+      Bootsnap.unload_cache!
+    end
+
     def test_unload_cache
       Bootsnap.unload_cache!
     end

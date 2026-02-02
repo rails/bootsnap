@@ -1,5 +1,10 @@
 # Unreleased
 
+# 1.22.0
+
+* Better fix for the `opendir` crash.
+* Add `bootsnap/rake` for cleaning the bootsnap cache as part of `rake clobber`.
+
 # 1.21.1
 
 * Prevent a Ruby crash while scanning load path if `opendir` fails without setting `errno`.

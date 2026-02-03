@@ -107,20 +107,6 @@ module Bootsnap
           assert_nil Store.new(@path).get("a")
         end
       end
-
-      private
-
-      def stub_const(owner, const_name, stub_value)
-        original_value = owner.const_get(const_name)
-        owner.send(:remove_const, const_name)
-        owner.const_set(const_name, stub_value)
-        begin
-          yield
-        ensure
-          owner.send(:remove_const, const_name)
-          owner.const_set(const_name, original_value)
-        end
-      end
     end
   end
 end

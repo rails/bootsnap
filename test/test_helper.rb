@@ -61,6 +61,18 @@ end
 
 module Minitest
   class Test
+    def stub_const(owner, const_name, stub_value)
+      original_value = owner.const_get(const_name)
+      owner.send(:remove_const, const_name)
+      owner.const_set(const_name, stub_value)
+      begin
+        yield
+      ensure
+        owner.send(:remove_const, const_name)
+        owner.const_set(const_name, original_value)
+      end
+    end
+
     module Help
       class << self
         def cache_path(dir, file, args_key = nil)

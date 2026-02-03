@@ -76,7 +76,7 @@ module Minitest
         def fnv1a_64(data)
           hash = 0xcbf29ce484222325
           data.bytes.each do |byte|
-            hash = hash ^ byte
+            hash ^= byte
             hash = (hash * 0x100000001b3) % (2**64)
           end
           hash

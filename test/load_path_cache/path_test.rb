@@ -49,7 +49,7 @@ module Bootsnap
         else
           refute(Path.new("/dev").non_directory?)
           refute(Path.new("/nope").non_directory?)
-          assert(Path.new("/dev/null").non_directory?)
+          assert(Path.new(File::NULL).non_directory?)
           assert(Path.new("/etc/hosts").non_directory?)
         end
       end

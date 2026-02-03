@@ -1,5 +1,7 @@
 # Unreleased
 
+* Require Ruby 2.7.
+
 # 1.22.0
 
 * Better fix for the `opendir` crash.

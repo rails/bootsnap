@@ -97,7 +97,7 @@ module Bootsnap
         end
 
         def compile_option=(hash)
-          super(hash)
+          super
           Bootsnap::CompileCache::ISeq.compile_option_updated
         end
       end

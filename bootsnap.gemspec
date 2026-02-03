@@ -29,7 +29,7 @@ Gem::Specification.new do |spec|
   spec.bindir        = "exe"
   spec.executables   = %w(bootsnap)
 
-  spec.required_ruby_version = ">= 2.6.0"
+  spec.required_ruby_version = ">= 2.7.0"
 
   if RUBY_PLATFORM =~ /java/
     spec.platform = "java"
@@ -38,5 +38,5 @@ Gem::Specification.new do |spec|
     spec.extensions  = ["ext/bootsnap/extconf.rb"]
   end
 
-  spec.add_runtime_dependency("msgpack", "~> 1.2")
+  spec.add_dependency("msgpack", "~> 1.2")
 end

@@ -150,7 +150,7 @@ module Bootsnap
     end
 
     # Allow the C extension to redefine `rb_get_path` without warning.
-    alias_method :rb_get_path, :rb_get_path # rubocop:disable Lint/DuplicateMethods
+    alias_method :rb_get_path, :rb_get_path
 
     private
 

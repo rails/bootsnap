@@ -2,7 +2,7 @@ AllCops:
   Exclude:
     - 'vendor/**/*'
     - 'tmp/**/*'
-  TargetRubyVersion: 2.6
+  TargetRubyVersion: 2.7
   NewCops: enable
   SuggestExtensions: false
 
@@ -46,6 +46,9 @@ Naming/MethodName:
   Exclude:
     - 'test/**/*'
 
+Naming/PredicateMethod:
+  Enabled: false # Too many false positives
+
 Naming/RescuedExceptionsVariableName:
   PreferredName: error
 
@@ -78,6 +81,9 @@ Layout/LineLength:
 
 # This doesn't take into account retrying from an exception
 Lint/SuppressedException:
+  Enabled: false
+
+Lint/UselessConstantScoping:
   Enabled: false
 
 Lint/NoReturnInBeginEndBlocks:
@@ -191,3 +197,6 @@ Style/ExponentialNotation:
 Style/OptionalBooleanParameter:
   Exclude:
     - '**/core_ext/**'
+
+Style/EmptyClassDefinition:
+  Enabled: false

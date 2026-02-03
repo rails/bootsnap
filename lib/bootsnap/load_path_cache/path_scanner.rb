@@ -83,13 +83,18 @@ module Bootsnap
             all_requirables.each(&:freeze)
 
             queue.reject! do |dir|
-              ignored_directories.include?(dir) ||
-                (contains_bundle_path && dir.start_with?(BUNDLE_PATH))
+              absolute_dir = File.join(root_path, dir)
+              ignored_directories.include?(dir) || ignored_directories.include?(absolute_dir) ||
+                (contains_bundle_path && absolute_dir.start_with?(BUNDLE_PATH))
             end
 
             while (path = queue.pop)
-              requirables, dirs = Native.scan_dir(File.join(root_path, path))
-              dirs.reject! { |dir| ignored_directories.include?(dir) }
+              absolute_base = File.join(root_path, path)
+              requirables, dirs = Native.scan_dir(absolute_base)
+              dirs.reject! do |dir|
+                absolute_dir = File.join(absolute_base, dir)
+                ignored_directories.include?(dir) || ignored_directories.include?(absolute_dir)
+              end
               dirs.map! { |f| File.join(path, f).freeze }
               requirables.map! { |f| File.join(path, f).freeze }
 

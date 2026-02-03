@@ -47,6 +47,59 @@ module Bootsnap
           assert_equal [], PathScanner.call("#{dir}/file")
         end
       end
+
+      def test_ignores_directories_by_name
+        original_ignored = PathScanner.ignored_directories
+        PathScanner.ignored_directories = ["ignored"]
+
+        Dir.mktmpdir do |dir|
+          FileUtils.mkdir_p("#{dir}/ignored")
+          FileUtils.mkdir_p("#{dir}/included")
+          FileUtils.touch("#{dir}/ignored/a.rb")
+          FileUtils.touch("#{dir}/included/b.rb")
+
+          entries = PathScanner.call(dir)
+          assert_equal ["included/b.rb"], entries.sort
+        end
+      ensure
+        PathScanner.ignored_directories = original_ignored
+      end
+
+      def test_ignores_directories_by_absolute_path
+        original_ignored = PathScanner.ignored_directories
+
+        Dir.mktmpdir do |dir|
+          PathScanner.ignored_directories = ["#{dir}/ignored"]
+
+          FileUtils.mkdir_p("#{dir}/ignored")
+          FileUtils.mkdir_p("#{dir}/included")
+          FileUtils.touch("#{dir}/ignored/a.rb")
+          FileUtils.touch("#{dir}/included/b.rb")
+
+          entries = PathScanner.call(dir)
+          assert_equal ["included/b.rb"], entries.sort
+        end
+      ensure
+        PathScanner.ignored_directories = original_ignored
+      end
+
+      def test_ignores_nested_directories_by_absolute_path
+        original_ignored = PathScanner.ignored_directories
+
+        Dir.mktmpdir do |dir|
+          PathScanner.ignored_directories = ["#{dir}/parent/ignored"]
+
+          FileUtils.mkdir_p("#{dir}/parent/ignored")
+          FileUtils.mkdir_p("#{dir}/parent/included")
+          FileUtils.touch("#{dir}/parent/ignored/a.rb")
+          FileUtils.touch("#{dir}/parent/included/b.rb")
+
+          entries = PathScanner.call(dir)
+          assert_equal ["parent/included/b.rb"], entries.sort
+        end
+      ensure
+        PathScanner.ignored_directories = original_ignored
+      end
     end
   end
 end

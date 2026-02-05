@@ -194,8 +194,12 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
     struct stat st;
     int dfd = -1;
 
-    errno = 0;
-    while ((entry = readdir(dirp))) {
+    while (1) {
+        errno = 0;
+
+        entry = readdir(dirp);
+        if (entry == NULL) break;
+
         if (entry->d_name[0] == '.') continue;
 
         if (RB_UNLIKELY(entry->d_type == DT_UNKNOWN || entry->d_type == DT_LNK)) {
@@ -212,11 +216,8 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
             }
 
             if (fstatat(dfd, entry->d_name, &st, 0)) {
-                if (errno == ENOENT) {
-                    // Broken symlinK
-                    errno = 0;
-                    continue;
-                }
+                if (errno == ENOENT) continue; // Broken symlink
+
                 int err = errno;
                 closedir(dirp);
                 bs_syserr_fail_dir_entry("fstatat", err, abspath, entry->d_name);
@@ -249,10 +250,15 @@ bs_rb_scan_dir(VALUE self, VALUE abspath)
         }
     }
 
-    if (closedir(dirp)) {
+    if (errno) {
+      int err = errno;
+      closedir(dirp);
+      bs_syserr_fail_path("readdir", err, abspath);
+    } else if (closedir(dirp)) {
         bs_syserr_fail_path("closedir", errno, abspath);
         return Qundef;
     }
+
     return result;
 }
 #endif

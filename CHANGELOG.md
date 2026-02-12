@@ -1,6 +1,9 @@
 # Unreleased
 
+# 1.23.0
+
 * Require Ruby 2.7.
+* Fix support for absolute paths in `BOOTSNAP_IGNORE_DIRECTORIES`.
 
 # 1.22.0
 

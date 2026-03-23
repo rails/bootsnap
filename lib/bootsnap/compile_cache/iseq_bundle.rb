@@ -176,6 +176,7 @@ module Bootsnap
 
             data_size = header["data_size"]
             return nil unless data_size
+            return nil if data_size > 500_000_000 # 500MB sanity limit
 
             data = f.read(data_size)
             return nil unless data && data.bytesize == data_size
@@ -232,7 +233,7 @@ module Bootsnap
           path = bundle_path(bundles_dir, load_path_entry)
           FileUtils.mkdir_p(File.dirname(path))
 
-          tmp = "#{path}.#{Process.pid}.tmp"
+          tmp = "#{path}.#{Process.pid}.#{rand(100_000)}.tmp"
           File.open(tmp, "wb") do |f|
             f.write(header_size)
             f.write(header_bytes)

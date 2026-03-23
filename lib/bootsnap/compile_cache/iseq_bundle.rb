@@ -3,80 +3,194 @@
 require "bootsnap/bootsnap"
 require "msgpack"
 require "digest/md5"
+require "fileutils"
 
 module Bootsnap
   module CompileCache
     module ISeqBundle
-      BUNDLE_FILENAME = "compile-cache-iseq-bundle"
+      BUNDLE_DIR = "iseq-bundles"
 
       class << self
-        attr_reader :bundle_path
-
         def install!(cache_dir, skip_validation: false)
-          # cache_dir is "…/bootsnap/compile-cache". The bundle sits alongside
-          # compile-cache-iseq in the parent dir (…/bootsnap/).
+          # cache_dir is "…/bootsnap/compile-cache". Bundles live alongside
+          # compile-cache-iseq in the parent dir: …/bootsnap/iseq-bundles/
           parent_dir = File.dirname(cache_dir)
-          @bundle_path = File.join(parent_dir, BUNDLE_FILENAME)
-          @index = nil
-          @data = nil
+          @bundles_dir = File.join(parent_dir, BUNDLE_DIR)
           @skip_validation = skip_validation
-
-          return unless File.exist?(@bundle_path)
-
-          load_bundle
+          @loaded_bundles = {}  # load_path_entry => GemBundle or :miss
+          @path_to_bundle = {} # resolved absolute path => GemBundle (populated lazily)
+          @enabled = true
         end
 
         def fetch(path)
-          return nil unless @index
+          return nil unless @enabled
 
+          bundle = @path_to_bundle[path]
+
+          if bundle
+            return bundle.fetch_entry(path, @skip_validation)
+          end
+
+          # We haven't seen this path yet. Find which load path entry owns it,
+          # then check/load/build the bundle for that entry.
+          load_path_entry = find_load_path_entry(path)
+          return nil unless load_path_entry
+
+          bundle = load_or_build_bundle(load_path_entry)
+          return nil unless bundle
+
+          # Register this path for future fast lookup
+          @path_to_bundle[path] = bundle
+          bundle.fetch_entry(path, @skip_validation)
+        end
+
+        def loaded?
+          @enabled
+        end
+
+        # Build bundles for specific load path entries. Used by CLI.
+        def build_for_paths!(cache_dir, load_path_entries)
+          parent_dir = File.dirname(cache_dir)
+          bundles_dir = File.join(parent_dir, BUNDLE_DIR)
+
+          built = 0
+          load_path_entries.each do |entry|
+            entry = File.realpath(entry) rescue next
+            next unless File.directory?(entry)
+
+            source_files = Dir.glob(File.join(entry, "**/*.rb"))
+            next if source_files.empty?
+
+            bundle = GemBundle.build(bundles_dir, entry, source_files)
+            built += 1 if bundle
+          end
+          built
+        end
+
+        private
+
+        def find_load_path_entry(absolute_path)
+          # The load path cache's @index maps feature → directory.
+          # We can derive the load path entry from the absolute path by checking
+          # which $LOAD_PATH entry is a prefix.
+          $LOAD_PATH.each do |lp|
+            lp_real = lp.to_s
+            if absolute_path.start_with?(lp_real) &&
+               absolute_path.getbyte(lp_real.bytesize) == 47 # "/"
+              return lp_real
+            end
+          end
+          nil
+        end
+
+        def load_or_build_bundle(load_path_entry)
+          cached = @loaded_bundles[load_path_entry]
+          return cached if cached.is_a?(GemBundle)
+          return nil if cached == :miss
+
+          bundle = GemBundle.load(@bundles_dir, load_path_entry)
+
+          unless bundle
+            # Auto-build on first encounter. This makes the precompile step
+            # optional — bundles are created lazily on first boot.
+            source_files = Dir.glob(File.join(load_path_entry, "**/*.rb"))
+            if source_files.size > 0
+              bundle = GemBundle.build(@bundles_dir, load_path_entry, source_files)
+            end
+          end
+
+          if bundle
+            @loaded_bundles[load_path_entry] = bundle
+            # Pre-register all paths in this bundle for direct lookup
+            bundle.each_path { |p| @path_to_bundle[p] = bundle }
+            bundle
+          else
+            @loaded_bundles[load_path_entry] = :miss
+            nil
+          end
+        end
+      end
+
+      # Represents a single gem's compiled ISeq bundle.
+      class GemBundle
+        attr_reader :load_path_entry
+
+        def initialize(load_path_entry, index, data)
+          @load_path_entry = load_path_entry
+          @index = index # { absolute_path => { "o" => offset, "s" => size, "sz" => src_size, "mt" => src_mtime } }
+          @data = data   # binary blob of concatenated ISeq binaries
+        end
+
+        def fetch_entry(path, skip_validation)
           entry = @index[path]
           return nil unless entry
 
-          offset = entry["o"]
-          size = entry["s"]
-
-          # Skip per-file stat when either:
-          # 1. Explicitly told to (readonly/production mode), OR
-          # 2. The Gemfile.lock fingerprint matches (gems haven't changed)
-          unless @skip_validation
-            source_size = entry["sz"]
-            source_mtime = entry["mt"]
+          unless skip_validation
             begin
               stat = File.stat(path)
             rescue Errno::ENOENT
               return nil
             end
-
-            return nil if stat.size != source_size
-            return nil if stat.mtime.to_i != source_mtime
+            return nil if stat.size != entry["sz"]
+            return nil if stat.mtime.to_i != entry["mt"]
           end
 
-          binary = @data.byteslice(offset, size)
-          return nil unless binary && binary.bytesize == size
+          binary = @data.byteslice(entry["o"], entry["s"])
+          return nil unless binary && binary.bytesize == entry["s"]
 
           RubyVM::InstructionSequence.load_from_binary(binary)
         rescue RuntimeError
-          nil # broken binary format
+          nil # broken binary
         end
 
-        def loaded?
-          !!@index
+        def each_path(&block)
+          @index.each_key(&block)
         end
 
-        # Build the bundle from source files by compiling each to ISeq binary.
-        # Run as a precompile step: `bootsnap precompile --bundle` or from Ruby.
-        def build!(cache_dir, source_paths: nil)
-          parent_dir = File.dirname(cache_dir)
-          bundle_path = File.join(parent_dir, BUNDLE_FILENAME)
+        # Load an existing bundle for a load path entry.
+        def self.load(bundles_dir, load_path_entry)
+          path = bundle_path(bundles_dir, load_path_entry)
+          return nil unless File.exist?(path)
 
-          raise ArgumentError, "source_paths must be provided for build!" unless source_paths
+          File.open(path, "rb") do |f|
+            header_size_raw = f.read(4)
+            return nil unless header_size_raw && header_size_raw.bytesize == 4
 
+            header_size = header_size_raw.unpack1("N")
+            return nil if header_size > 50_000_000 # 50MB sanity check
+
+            header_bytes = f.read(header_size)
+            return nil unless header_bytes && header_bytes.bytesize == header_size
+
+            header = MessagePack.unpack(header_bytes)
+            return nil unless header.is_a?(Hash)
+            return nil unless header["version"] == bundle_version
+            return nil unless header["load_path"] == load_path_entry
+
+            data_size = header["data_size"]
+            return nil unless data_size
+
+            data = f.read(data_size)
+            return nil unless data && data.bytesize == data_size
+
+            new(load_path_entry, header["index"], data)
+          end
+        rescue Errno::ENOENT, MessagePack::MalformedFormatError, EOFError
+          nil
+        end
+
+        # Build a bundle for a load path entry from its source files.
+        def self.build(bundles_dir, load_path_entry, source_files)
           index = {}
           data_parts = []
           current_offset = 0
 
-          source_paths.each do |source_path|
-            binary = compile_to_binary(source_path)
+          source_files.each do |source_path|
+            binary = begin
+              RubyVM::InstructionSequence.compile_file(source_path).to_binary
+            rescue SyntaxError, TypeError
+              next
+            end
             next unless binary
 
             stat = File.stat(source_path)
@@ -90,90 +204,51 @@ module Bootsnap
 
             data_parts << binary
             current_offset += binary.bytesize
-          rescue Errno::ENOENT, SyntaxError, TypeError
+          rescue Errno::ENOENT
             next
           end
 
-          blob = data_parts.join
+          return nil if index.empty?
 
+          blob = data_parts.join
           header = {
             "version" => bundle_version,
-            "gemfile_lock_fingerprint" => gemfile_lock_fingerprint,
+            "load_path" => load_path_entry,
             "index" => index,
             "data_size" => blob.bytesize,
             "entry_count" => index.size,
           }
 
           header_bytes = MessagePack.pack(header)
-          header_size = [header_bytes.bytesize].pack("N") # 4-byte length prefix
+          header_size = [header_bytes.bytesize].pack("N")
 
-          tmp = "#{bundle_path}.#{Process.pid}.tmp"
+          path = bundle_path(bundles_dir, load_path_entry)
+          FileUtils.mkdir_p(File.dirname(path))
+
+          tmp = "#{path}.#{Process.pid}.tmp"
           File.open(tmp, "wb") do |f|
             f.write(header_size)
             f.write(header_bytes)
             f.write(blob)
           end
-          File.rename(tmp, bundle_path)
+          File.rename(tmp, path)
 
-          { entries: index.size, data_size: blob.bytesize, path: bundle_path }
+          new(load_path_entry, index, blob)
         rescue Errno::EEXIST
           retry
         rescue SystemCallError
-          { entries: 0, data_size: 0, path: bundle_path }
-        end
-
-        private
-
-        def bundle_version
-          "#{Bootsnap::VERSION}-#{RUBY_REVISION}-#{RUBY_PLATFORM}"
-        end
-
-        def gemfile_lock_fingerprint
-          lockfile = ENV["BUNDLE_GEMFILE"] ? "#{ENV['BUNDLE_GEMFILE']}.lock" : "Gemfile.lock"
-          if File.exist?(lockfile)
-            Digest::MD5.hexdigest(File.read(lockfile))
-          end
-        end
-
-        def load_bundle
-          File.open(@bundle_path, "rb") do |f|
-            header_size_raw = f.read(4)
-            return unless header_size_raw && header_size_raw.bytesize == 4
-
-            header_size = header_size_raw.unpack1("N")
-            return if header_size > 100_000_000 # sanity: 100MB max header
-
-            header_bytes = f.read(header_size)
-            return unless header_bytes && header_bytes.bytesize == header_size
-
-            header = MessagePack.unpack(header_bytes)
-            return unless header.is_a?(Hash)
-            return unless header["version"] == bundle_version
-
-            @index = header["index"]
-            data_size = header["data_size"]
-            return unless data_size
-
-            @data = f.read(data_size)
-            return unless @data && @data.bytesize == data_size
-
-            # If the Gemfile.lock matches what was bundled, skip per-file
-            # validation automatically. Gems don't change without a bundle
-            # install, so the lock fingerprint proves freshness.
-            stored_fingerprint = header["gemfile_lock_fingerprint"]
-            if stored_fingerprint && stored_fingerprint == gemfile_lock_fingerprint
-              @skip_validation = true
-            end
-          end
-        rescue Errno::ENOENT, MessagePack::MalformedFormatError, EOFError
-          @index = nil
-          @data = nil
-        end
-
-        def compile_to_binary(source_path)
-          RubyVM::InstructionSequence.compile_file(source_path).to_binary
-        rescue SyntaxError, TypeError
           nil
+        end
+
+        def self.bundle_path(bundles_dir, load_path_entry)
+          # Use MD5 of load path entry as filename. The load path includes
+          # gem name + version, so upgrading a gem = different hash = new bundle.
+          hash = Digest::MD5.hexdigest(load_path_entry)
+          File.join(bundles_dir, hash[0..1], hash[2..])
+        end
+
+        def self.bundle_version
+          "#{Bootsnap::VERSION}-#{RUBY_REVISION}-#{RUBY_PLATFORM}"
         end
       end
     end

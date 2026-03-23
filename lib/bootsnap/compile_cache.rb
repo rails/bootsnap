@@ -19,8 +19,10 @@ module Bootsnap
           require_relative "compile_cache/iseq"
           Bootsnap::CompileCache::ISeq.install!(cache_dir)
 
-          # Load bundled compile cache if available (built by `bootsnap precompile --bundle`).
-          # In readonly mode (production), skip per-file stat validation for max speed.
+          # Per-gem ISeq bundles: each $LOAD_PATH entry gets its own bundle file.
+          # Bundles are auto-built on first boot if missing, or pre-built via
+          # `bootsnap precompile --bundle`. Gem path includes version, so
+          # upgrading a gem naturally invalidates only that gem's bundle.
           require_relative "compile_cache/iseq_bundle"
           Bootsnap::CompileCache::ISeqBundle.install!(cache_dir, skip_validation: readonly)
         elsif $VERBOSE

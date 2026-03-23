@@ -170,30 +170,20 @@ module Bootsnap
     def build_iseq_bundle(sources)
       require "bootsnap/compile_cache/iseq_bundle"
 
-      # Collect all .rb files that were precompiled
-      source_paths = []
-      sources.each do |path|
-        list_files(path, "**/*.rb").each { |f| source_paths << File.expand_path(f) }
-      end
+      # Collect load path entries to bundle
+      load_path_entries = sources.map { |d| File.expand_path(d) }
 
       if compile_gemfile
         gem_pattern = %r{^#{Regexp.escape(Bundler.bundle_path.to_s)}/?(?:bundler/)?gems/[^/]+}
-        gem_paths = $LOAD_PATH.map { |p| p[gem_pattern] || p }.uniq
+        gem_entries = $LOAD_PATH.map { |p| p[gem_pattern] || p }.uniq
         gem_exclude = Regexp.union([exclude, "/spec/", "/test/", "/features/"].compact)
-        gem_paths.each do |path|
-          next if gem_exclude.match?(path)
-          list_files(path, "**/*.rb").each do |f|
-            expanded = File.expand_path(f)
-            source_paths << expanded unless gem_exclude.match?(expanded)
-          end
-        end
+        gem_entries.reject! { |p| gem_exclude.match?(p) }
+        load_path_entries.concat(gem_entries)
       end
 
-      result = Bootsnap::CompileCache::ISeqBundle.build!(cache_dir, source_paths: source_paths)
-      if verbose
-        $stderr.puts("ISeq bundle: #{result[:entries]} files, #{result[:data_size] / 1024}KB")
-        $stderr.puts("  Path: #{result[:path]}")
-      end
+      load_path_entries.uniq!
+      built = Bootsnap::CompileCache::ISeqBundle.build_for_paths!(cache_dir, load_path_entries)
+      $stderr.puts("ISeq bundles: built #{built} per-gem bundles") if verbose
     end
 
     def fix_default_encoding

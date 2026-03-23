@@ -18,6 +18,11 @@ module Bootsnap
         if supported?
           require_relative "compile_cache/iseq"
           Bootsnap::CompileCache::ISeq.install!(cache_dir)
+
+          # Load bundled compile cache if available (built by `bootsnap precompile --bundle`).
+          # In readonly mode (production), skip per-file stat validation for max speed.
+          require_relative "compile_cache/iseq_bundle"
+          Bootsnap::CompileCache::ISeqBundle.install!(cache_dir, skip_validation: readonly)
         elsif $VERBOSE
           warn("[bootsnap/setup] bytecode caching is not supported on this implementation of Ruby")
         end

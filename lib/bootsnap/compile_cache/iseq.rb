@@ -88,6 +88,13 @@ module Bootsnap
           # Having coverage enabled prevents iseq dumping/loading.
           return nil if defined?(Coverage) && Coverage.running?
 
+          # Fast path: check the bundled compile cache first (single file, in-memory).
+          # This avoids 5+ syscalls per require that the individual cache needs.
+          if defined?(Bootsnap::CompileCache::ISeqBundle) && Bootsnap::CompileCache::ISeqBundle.loaded?
+            result = Bootsnap::CompileCache::ISeqBundle.fetch(path.to_s)
+            return result if result
+          end
+
           Bootsnap::CompileCache::ISeq.fetch(path.to_s)
         rescue RuntimeError => error
           if error.message =~ /unmatched platform/

@@ -11,12 +11,19 @@ module Bootsnap
       BUNDLE_DIR = "iseq-bundles"
 
       class << self
-        def install!(cache_dir, skip_validation: false)
+        def install!(cache_dir, skip_validation: false, auto_build: true)
+          # Disable entirely via env var (useful for tests/debugging)
+          if ENV["BOOTSNAP_NO_BUNDLE"]
+            @enabled = false
+            return
+          end
+
           # cache_dir is "…/bootsnap/compile-cache". Bundles live alongside
           # compile-cache-iseq in the parent dir: …/bootsnap/iseq-bundles/
           parent_dir = File.dirname(cache_dir)
           @bundles_dir = File.join(parent_dir, BUNDLE_DIR)
           @skip_validation = skip_validation
+          @auto_build = auto_build
           @loaded_bundles = {}  # load_path_entry => GemBundle or :miss
           @path_to_bundle = {} # resolved absolute path => GemBundle (populated lazily)
           @enabled = true
@@ -90,7 +97,7 @@ module Bootsnap
 
           bundle = GemBundle.load(@bundles_dir, load_path_entry)
 
-          unless bundle
+          if !bundle && @auto_build
             # Auto-build on first encounter. This makes the precompile step
             # optional — bundles are created lazily on first boot.
             source_files = Dir.glob(File.join(load_path_entry, "**/*.rb"))

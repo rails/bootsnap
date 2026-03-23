@@ -9,7 +9,7 @@ module Bootsnap
 
     Error = Class.new(StandardError)
 
-    def self.setup(cache_dir:, iseq:, yaml:, json: (json_unset = true), readonly: false, revalidation: false)
+    def self.setup(cache_dir:, iseq:, yaml:, json: (json_unset = true), readonly: false, revalidation: false, development_mode: false)
       unless json_unset
         warn("Bootsnap::CompileCache.setup `json` argument is deprecated and has no effect")
       end
@@ -24,7 +24,11 @@ module Bootsnap
           # `bootsnap precompile --bundle`. Gem path includes version, so
           # upgrading a gem naturally invalidates only that gem's bundle.
           require_relative "compile_cache/iseq_bundle"
-          Bootsnap::CompileCache::ISeqBundle.install!(cache_dir, skip_validation: readonly)
+          Bootsnap::CompileCache::ISeqBundle.install!(
+            cache_dir,
+            skip_validation: readonly,
+            auto_build: !development_mode,
+          )
         elsif $VERBOSE
           warn("[bootsnap/setup] bytecode caching is not supported on this implementation of Ruby")
         end

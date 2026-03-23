@@ -13,6 +13,12 @@ to optimize and cache expensive computations. See [How Does This Work](#how-does
 * In Shopify core (a large app), about 25% of this gain can be attributed to `compile_cache_*`
   features; 75% to path caching. This is fairly representative.
 
+With **pre-built load path index** and **per-gem ISeq bundles** (see below):
+
+- A Rails app with 236 gems boots in ~5.6s, down from ~10s without bundles (1.8x).
+- `Bootsnap.setup()` warm init drops from ~220ms to ~8ms (27x) via the pre-built index.
+- `Bundler.require` drops from ~7s to ~2.8s (2.5x) via per-gem ISeq bundles.
+
 ## Usage
 
 This gem works on macOS and Linux.
@@ -84,6 +90,7 @@ well together.
 - `BOOTSNAP_IGNORE_DIRECTORIES` a comma separated list of directories that shouldn't be scanned.
   Useful when you have large directories of non-ruby files inside `$LOAD_PATH`.
   It defaults to ignore any directory named `node_modules`.
+- `BOOTSNAP_NO_BUNDLE` disables per-gem ISeq bundles entirely.
 
 ### Environments
 
@@ -332,6 +339,35 @@ Example:
 ```bash
 $ bundle exec bootsnap precompile --gemfile app/ lib/ config/
 ```
+
+### ISeq Bundles
+
+Bootsnap can pack compiled Ruby bytecode into per-gem bundle files, dramatically reducing the number
+of filesystem operations during boot. Instead of opening thousands of individual cache files (5+
+syscalls per `require`), each gem's compiled code is loaded from a single file.
+
+**Automatic mode (production):** When `development_mode: false`, bundles are built automatically
+on the first boot for each gem encountered. Subsequent boots load from the pre-built bundles.
+No manual step is needed.
+
+**Pre-build mode (Docker/CI):** For maximum first-boot speed, pre-build bundles during your image build:
+
+```bash
+$ bundle exec bootsnap precompile --bundle --gemfile app/ lib/ config/
+```
+
+**How invalidation works:** Each bundle is keyed to its `$LOAD_PATH` entry, which includes the gem
+version (e.g., `/gems/nokogiri-1.16.0/lib`). When a gem is added or upgraded:
+
+- **Upgraded gem:** New version = new path = new bundle built automatically. Old bundles are unused.
+- **New gem:** No bundle exists yet, so it falls back to the individual compile cache (standard
+  bootsnap behavior) until a bundle is built on the next non-development boot.
+- **Existing gems:** Unaffected. Their bundles remain valid.
+
+This means `bundle install` doesn't invalidate the entire cache — only the changed gems need
+new bundles.
+
+**Disabling bundles:** Set `BOOTSNAP_NO_BUNDLE=1` to disable ISeq bundles entirely.
 
 ## Known issues
 

@@ -75,6 +75,7 @@ module Bootsnap
         yaml: compile_cache_yaml,
         readonly: readonly,
         revalidation: revalidation,
+        development_mode: development_mode,
       )
     end
 

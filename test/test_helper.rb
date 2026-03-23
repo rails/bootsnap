@@ -57,6 +57,13 @@ module NullCache
   def self.fetch(*)
     yield
   end
+
+  def self.load_index(*)
+    nil
+  end
+
+  def self.save_index(*)
+  end
 end
 
 module Minitest

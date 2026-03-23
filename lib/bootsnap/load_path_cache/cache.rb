@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../explicit_require"
+require "digest/md5"
 
 module Bootsnap
   module LoadPathCache
@@ -11,17 +12,44 @@ module Bootsnap
         @development_mode = development_mode
         @store = store
         @mutex = Mutex.new
-        @path_obj = path_obj.map! do |f|
-          if File.exist?(f)
-            File.realpath(f).freeze
-          elsif f.frozen?
-            f
-          else
-            f.dup.freeze
-          end
-        end
         @has_relative_paths = nil
-        reinitialize
+        @index_dirty = false
+
+        # Fast path: check if we have a pre-built index matching the current
+        # raw $LOAD_PATH BEFORE doing expensive File.realpath calls.
+        raw_fingerprint = self.class.load_path_fingerprint(path_obj)
+        cached = store.load_index(raw_fingerprint)
+
+        if cached && cached["resolved_paths"]
+          # Index hit — restore resolved paths and index without any syscalls
+          resolved = cached["resolved_paths"]
+          path_obj.map!.with_index { |f, i| resolved[i] || f.to_s.freeze }
+          @path_obj = path_obj
+          @index = cached["index"].dup
+          @generated_at = now
+          @path_obj.each { |p| @has_relative_paths = true unless p.start_with?(SLASH) }
+          ChangeObserver.register(@path_obj, self)
+        else
+          # Cache miss — resolve realpaths (expensive) and build index
+          @path_obj = path_obj.map! do |f|
+            if File.exist?(f)
+              File.realpath(f).freeze
+            elsif f.frozen?
+              f
+            else
+              f.dup.freeze
+            end
+          end
+          reinitialize(save_fingerprint: raw_fingerprint)
+        end
+      end
+
+      def self.load_path_fingerprint(path_obj)
+        # Digest of the ordered load path entries. In production mode this is
+        # sufficient — gem paths don't change without a deploy/bundle install.
+        # For development mode, volatile paths get mtime-checked separately via
+        # the existing stale?/AGE_THRESHOLD mechanism.
+        Digest::MD5.hexdigest(path_obj.join("\0")).freeze
       end
 
       TRUFFLERUBY_LIB_DIR_PREFIX = if RUBY_ENGINE == "truffleruby"
@@ -55,6 +83,10 @@ module Bootsnap
       # loadpath.
       def find(feature)
         reinitialize if (@has_relative_paths && dir_changed?) || stale?
+        if @index_dirty
+          @index_dirty = false
+          save_index_locked
+        end
         feature = feature.to_s.freeze
 
         return feature if Bootsnap.absolute_path?(feature)
@@ -110,26 +142,49 @@ module Bootsnap
       def unshift_paths(sender, *paths)
         return unless sender == @path_obj
 
-        @mutex.synchronize { unshift_paths_locked(*paths) }
+        @mutex.synchronize do
+          unshift_paths_locked(*paths)
+          @index_dirty = true
+        end
       end
 
       def push_paths(sender, *paths)
         return unless sender == @path_obj
 
-        @mutex.synchronize { push_paths_locked(*paths) }
+        @mutex.synchronize do
+          push_paths_locked(*paths)
+          @index_dirty = true
+        end
       end
 
-      def reinitialize(path_obj = @path_obj)
+      def reinitialize(path_obj = @path_obj, save_fingerprint: nil)
         @mutex.synchronize do
           @path_obj = path_obj
           ChangeObserver.register(@path_obj, self)
           @index = {}
           @generated_at = now
           push_paths_locked(*@path_obj)
+
+          # Save the pre-built index for fast loading on next boot.
+          # Includes resolved paths so we can skip File.realpath too.
+          if save_fingerprint
+            @store.save_index(save_fingerprint, {
+              "index" => @index,
+              "resolved_paths" => @path_obj.to_a,
+            })
+          end
         end
       end
 
       private
+
+      def save_index_locked
+        fingerprint = self.class.load_path_fingerprint(@path_obj)
+        @store.save_index(fingerprint, {
+          "index" => @index,
+          "resolved_paths" => @path_obj.to_a,
+        })
+      end
 
       def dir_changed?
         @prev_dir ||= Dir.pwd

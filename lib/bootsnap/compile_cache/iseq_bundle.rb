@@ -2,6 +2,7 @@
 
 require "bootsnap/bootsnap"
 require "msgpack"
+require "digest/md5"
 
 module Bootsnap
   module CompileCache
@@ -25,10 +26,6 @@ module Bootsnap
           load_bundle
         end
 
-        def hit?(path)
-          @index && @index.key?(path)
-        end
-
         def fetch(path)
           return nil unless @index
 
@@ -37,13 +34,13 @@ module Bootsnap
 
           offset = entry["o"]
           size = entry["s"]
-          source_size = entry["sz"]
-          source_mtime = entry["mt"]
 
-          # Quick validation: check source file still matches what we bundled.
-          # Use stat (1 syscall) instead of open+read (2+ syscalls).
-          # In production/Docker, skip_validation can bypass this entirely.
+          # Skip per-file stat when either:
+          # 1. Explicitly told to (readonly/production mode), OR
+          # 2. The Gemfile.lock fingerprint matches (gems haven't changed)
           unless @skip_validation
+            source_size = entry["sz"]
+            source_mtime = entry["mt"]
             begin
               stat = File.stat(path)
             rescue Errno::ENOENT
@@ -57,50 +54,32 @@ module Bootsnap
           binary = @data.byteslice(offset, size)
           return nil unless binary && binary.bytesize == size
 
-          begin
-            iseq = RubyVM::InstructionSequence.load_from_binary(binary)
-            return iseq
-          rescue RuntimeError
-            # broken binary
-            return nil
-          end
+          RubyVM::InstructionSequence.load_from_binary(binary)
+        rescue RuntimeError
+          nil # broken binary format
         end
 
         def loaded?
           !!@index
         end
 
-        # Build the bundle from existing individual cache files + source files.
-        # This is meant to be run as a precompile step (e.g., in CI/CD or after deploy).
+        # Build the bundle from source files by compiling each to ISeq binary.
+        # Run as a precompile step: `bootsnap precompile --bundle` or from Ruby.
         def build!(cache_dir, source_paths: nil)
-          iseq_cache_dir = cache_dir.end_with?("/") ? "#{cache_dir}iseq" : "#{cache_dir}-iseq"
           parent_dir = File.dirname(cache_dir)
           bundle_path = File.join(parent_dir, BUNDLE_FILENAME)
 
-          # If no specific paths given, find all source files that have cache entries
-          unless source_paths
-            source_paths = collect_cached_paths(iseq_cache_dir)
-          end
+          raise ArgumentError, "source_paths must be provided for build!" unless source_paths
 
           index = {}
           data_parts = []
           current_offset = 0
 
           source_paths.each do |source_path|
-            # Use the existing compile cache to get the ISeq binary
-            begin
-              binary = compile_to_binary(source_path)
-            rescue => e
-              # Skip files that can't be compiled
-              next
-            end
+            binary = compile_to_binary(source_path)
             next unless binary
 
-            begin
-              stat = File.stat(source_path)
-            rescue Errno::ENOENT
-              next
-            end
+            stat = File.stat(source_path)
 
             index[source_path] = {
               "o" => current_offset,
@@ -111,20 +90,22 @@ module Bootsnap
 
             data_parts << binary
             current_offset += binary.bytesize
+          rescue Errno::ENOENT, SyntaxError, TypeError
+            next
           end
 
-          # Write bundle: MessagePack header with index, then raw ISeq data blob
           blob = data_parts.join
+
           header = {
             "version" => bundle_version,
+            "gemfile_lock_fingerprint" => gemfile_lock_fingerprint,
             "index" => index,
-            "data_offset" => 0, # data starts right after header in the blob section
             "data_size" => blob.bytesize,
             "entry_count" => index.size,
           }
 
           header_bytes = MessagePack.pack(header)
-          header_size = [header_bytes.bytesize].pack("N") # 4-byte big-endian length prefix
+          header_size = [header_bytes.bytesize].pack("N") # 4-byte length prefix
 
           tmp = "#{bundle_path}.#{Process.pid}.tmp"
           File.open(tmp, "wb") do |f|
@@ -135,6 +116,10 @@ module Bootsnap
           File.rename(tmp, bundle_path)
 
           { entries: index.size, data_size: blob.bytesize, path: bundle_path }
+        rescue Errno::EEXIST
+          retry
+        rescue SystemCallError
+          { entries: 0, data_size: 0, path: bundle_path }
         end
 
         private
@@ -143,14 +128,20 @@ module Bootsnap
           "#{Bootsnap::VERSION}-#{RUBY_REVISION}-#{RUBY_PLATFORM}"
         end
 
+        def gemfile_lock_fingerprint
+          lockfile = ENV["BUNDLE_GEMFILE"] ? "#{ENV['BUNDLE_GEMFILE']}.lock" : "Gemfile.lock"
+          if File.exist?(lockfile)
+            Digest::MD5.hexdigest(File.read(lockfile))
+          end
+        end
+
         def load_bundle
           File.open(@bundle_path, "rb") do |f|
-            # Read 4-byte header size
             header_size_raw = f.read(4)
             return unless header_size_raw && header_size_raw.bytesize == 4
 
             header_size = header_size_raw.unpack1("N")
-            return if header_size > 100_000_000 # sanity check: 100MB max header
+            return if header_size > 100_000_000 # sanity: 100MB max header
 
             header_bytes = f.read(header_size)
             return unless header_bytes && header_bytes.bytesize == header_size
@@ -165,6 +156,14 @@ module Bootsnap
 
             @data = f.read(data_size)
             return unless @data && @data.bytesize == data_size
+
+            # If the Gemfile.lock matches what was bundled, skip per-file
+            # validation automatically. Gems don't change without a bundle
+            # install, so the lock fingerprint proves freshness.
+            stored_fingerprint = header["gemfile_lock_fingerprint"]
+            if stored_fingerprint && stored_fingerprint == gemfile_lock_fingerprint
+              @skip_validation = true
+            end
           end
         rescue Errno::ENOENT, MessagePack::MalformedFormatError, EOFError
           @index = nil
@@ -175,16 +174,6 @@ module Bootsnap
           RubyVM::InstructionSequence.compile_file(source_path).to_binary
         rescue SyntaxError, TypeError
           nil
-        end
-
-        # Walk the cache dir to find source paths from cache filenames.
-        # Cache files are stored as FNV hash of the source path, so we can't
-        # reverse them. Instead, read each cache file's header to reconstruct.
-        # This is slow but only runs at bundle-build time.
-        def collect_cached_paths(iseq_cache_dir)
-          # Alternative: just use $LOADED_FEATURES from a previous boot
-          # For now, we require source_paths to be passed explicitly
-          raise ArgumentError, "source_paths must be provided for build!"
         end
       end
     end

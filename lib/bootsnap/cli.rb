@@ -20,7 +20,7 @@ module Bootsnap
 
     attr_reader :cache_dir, :argv
 
-    attr_accessor :compile_gemfile, :exclude, :verbose, :iseq, :yaml, :jobs
+    attr_accessor :compile_gemfile, :exclude, :verbose, :iseq, :yaml, :jobs, :bundle
 
     def initialize(argv)
       @argv = argv
@@ -31,6 +31,7 @@ module Bootsnap
       self.jobs = nil
       self.iseq = true
       self.yaml = true
+      self.bundle = false
     end
 
     def precompile_command(*sources)
@@ -70,6 +71,10 @@ module Bootsnap
 
         if (exitstatus = @work_pool.shutdown)
           exit(exitstatus)
+        end
+
+        if bundle && iseq
+          build_iseq_bundle(main_sources)
         end
       end
       0
@@ -162,6 +167,35 @@ module Bootsnap
       end
     end
 
+    def build_iseq_bundle(sources)
+      require "bootsnap/compile_cache/iseq_bundle"
+
+      # Collect all .rb files that were precompiled
+      source_paths = []
+      sources.each do |path|
+        list_files(path, "**/*.rb").each { |f| source_paths << File.expand_path(f) }
+      end
+
+      if compile_gemfile
+        gem_pattern = %r{^#{Regexp.escape(Bundler.bundle_path.to_s)}/?(?:bundler/)?gems/[^/]+}
+        gem_paths = $LOAD_PATH.map { |p| p[gem_pattern] || p }.uniq
+        gem_exclude = Regexp.union([exclude, "/spec/", "/test/", "/features/"].compact)
+        gem_paths.each do |path|
+          next if gem_exclude.match?(path)
+          list_files(path, "**/*.rb").each do |f|
+            expanded = File.expand_path(f)
+            source_paths << expanded unless gem_exclude.match?(expanded)
+          end
+        end
+      end
+
+      result = Bootsnap::CompileCache::ISeqBundle.build!(cache_dir, source_paths: source_paths)
+      if verbose
+        $stderr.puts("ISeq bundle: #{result[:entries]} files, #{result[:data_size] / 1024}KB")
+        $stderr.puts("  Path: #{result[:path]}")
+      end
+    end
+
     def fix_default_encoding
       if Encoding.default_external == Encoding::US_ASCII
         Encoding.default_external = Encoding::UTF_8
@@ -236,6 +270,12 @@ module Bootsnap
           Path pattern to not precompile. e.g. --exclude 'aws-sdk|google-api'
         HELP
         opts.on("--exclude PATTERN", help) { |pattern| exclude_pattern(pattern) }
+
+        help = <<~HELP
+          Build an ISeq bundle for faster boot. Packs all compiled Ruby
+          into a single file, eliminating thousands of file operations on boot.
+        HELP
+        opts.on("--bundle", help.strip) { self.bundle = true }
 
         help = <<~HELP
           Disable ISeq (.rb) precompilation.

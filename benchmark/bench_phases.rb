@@ -58,11 +58,11 @@ end
 
 def fmt(seconds)
   if seconds < 0.001
-    "%.1fµs" % (seconds * 1_000_000)
+    format("%.1fµs", seconds * 1_000_000)
   elsif seconds < 1
-    "%.2fms" % (seconds * 1000)
+    format("%.2fms", seconds * 1000)
   else
-    "%.3fs" % seconds
+    format("%.3fs", seconds)
   end
 end
 
@@ -73,7 +73,7 @@ def median(arr)
 end
 
 def stats(arr)
-  { median: median(arr), min: arr.min, max: arr.max, mean: arr.sum / arr.size.to_f }
+  {median: median(arr), min: arr.min, max: arr.max, mean: arr.sum / arr.size.to_f}
 end
 
 # ---------- generate gems if needed ----------
@@ -97,37 +97,37 @@ load File.join(BENCH_DIR, "manifest.rb")
 
 baseline_stats = nil
 if BENCH_BASELINE
-puts "-" * 70
-puts "Phase 1: Baseline require (no bootsnap)"
-puts "-" * 70
-phase_start = clock
+  puts "-" * 70
+  puts "Phase 1: Baseline require (no bootsnap)"
+  puts "-" * 70
+  phase_start = clock
 
-baseline_times = RUNS.times.map do |run|
-  # Fork to get clean Ruby state each time
-  rd, wr = IO.pipe
-  pid = fork do
-    rd.close
-    FAKE_LOAD_PATHS.each { |p| $LOAD_PATH.push(p) }
+  baseline_times = RUNS.times.map do |run|
+    # Fork to get clean Ruby state each time
+    rd, wr = IO.pipe
+    pid = fork do
+      rd.close
+      FAKE_LOAD_PATHS.each { |p| $LOAD_PATH.push(p) }
 
-    elapsed, = measure do
-      FAKE_GEM_NAMES.each { |name| require name }
+      elapsed, = measure do
+        FAKE_GEM_NAMES.each { |name| require name }
+      end
+
+      wr.write(elapsed.to_s)
+      wr.close
+      exit!(0)
     end
-
-    wr.write(elapsed.to_s)
     wr.close
-    exit!(0)
+    Process.wait(pid)
+    result = rd.read.to_f
+    rd.close
+    printf "  Run %<run>d: %<time>s\n", run: run + 1, time: fmt(result)
+    result
   end
-  wr.close
-  Process.wait(pid)
-  result = rd.read.to_f
-  rd.close
-  printf "  Run %d: %s\n", run + 1, fmt(result)
-  result
-end
 
-baseline_stats = stats(baseline_times)
-puts "  Median: #{fmt(baseline_stats[:median])}  (phase took #{fmt(clock - phase_start)})"
-puts
+  baseline_stats = stats(baseline_times)
+  puts "  Median: #{fmt(baseline_stats[:median])}  (phase took #{fmt(clock - phase_start)})"
+  puts
 else
   puts "Phase 1: Baseline (skipped, set BENCH_BASELINE=1 to enable)"
 end # BENCH_BASELINE
@@ -170,8 +170,9 @@ if BENCH_COLD
     Process.wait(pid)
     result = JSON.parse(rd.read)
     rd.close
-    printf "  Run %d: init=%s  push_paths=%s  total=%s\n",
-           run + 1, fmt(result["init"]), fmt(result["push"]), fmt(result["total"])
+    printf "  Run %<run>d: init=%<init>s  push_paths=%<push>s  total=%<total>s\n",
+           run: run + 1, init: fmt(result["init"]), push: fmt(result["push"]),
+           total: fmt(result["total"])
     result
   end
 
@@ -232,7 +233,8 @@ warm_init_times = RUNS.times.map do |run|
   Process.wait(pid)
   result = JSON.parse(rd.read)
   rd.close
-  printf "  Run %d: total=%s\n", run + 1, fmt(result["total"])
+  printf "  Run %<run>d: total=%<total>s\n",
+         run: run + 1, total: fmt(result["total"])
   result
 end
 
@@ -242,53 +244,58 @@ puts
 
 per_req_us = nil
 if BENCH_REQUIRE
-# ---------- Phase 4: Per-require lookup time ----------
+  # ---------- Phase 4: Per-require lookup time ----------
 
-puts "-" * 70
-puts "Phase 4: Per-require lookup time (warm cache, #{NUM_GEMS * (FILES_PER_GEM + 1)} requires)"
-puts "-" * 70
-phase_start = clock
+  puts "-" * 70
+  puts "Phase 4: Per-require lookup time (warm cache, #{NUM_GEMS * (FILES_PER_GEM + 1)} requires)"
+  puts "-" * 70
+  phase_start = clock
 
-require_times = RUNS.times.map do |run|
-  rd, wr = IO.pipe
-  pid = fork do
-    rd.close
-    FAKE_LOAD_PATHS.each { |p| $LOAD_PATH.push(p) }
-    require "bootsnap"
-    Bootsnap.setup(cache_dir: CACHE_DIR, development_mode: false, load_path_cache: true)
+  require_times = RUNS.times.map do |run|
+    rd, wr = IO.pipe
+    pid = fork do
+      rd.close
+      FAKE_LOAD_PATHS.each { |p| $LOAD_PATH.push(p) }
+      require "bootsnap"
+      Bootsnap.setup(cache_dir: CACHE_DIR, development_mode: false, load_path_cache: true)
 
-    total_requires = 0
-    elapsed, = measure do
-      FAKE_GEM_NAMES.each do |name|
-        require name
-        total_requires += 1
+      total_requires = 0
+      elapsed, = measure do
+        FAKE_GEM_NAMES.each do |name|
+          require name
+          total_requires += 1
+        end
       end
+
+      features_loaded = $LOADED_FEATURES.size
+      wr.write(JSON.dump({
+        elapsed: elapsed,
+        features_loaded: features_loaded,
+        total_requires: total_requires,
+      }))
+      wr.close
+      exit!(0)
     end
-
-    features_loaded = $LOADED_FEATURES.size
-    wr.write(JSON.dump({
-      elapsed: elapsed,
-      features_loaded: features_loaded,
-      total_requires: total_requires,
-    }))
     wr.close
-    exit!(0)
+    Process.wait(pid)
+    result = JSON.parse(rd.read)
+    rd.close
+    per_require = result["elapsed"] / result["features_loaded"]
+    printf "  Run %<run>d: %<time>s total for %<features>d features (%<per_req>.1fµs/require)\n",
+           run: run + 1, time: fmt(result["elapsed"]),
+           features: result["features_loaded"], per_req: per_require * 1_000_000
+    result
   end
-  wr.close
-  Process.wait(pid)
-  result = JSON.parse(rd.read)
-  rd.close
-  per_require = result["elapsed"] / result["features_loaded"]
-  printf "  Run %d: %s total for %d features (%.1fµs/require)\n",
-         run + 1, fmt(result["elapsed"]), result["features_loaded"], per_require * 1_000_000
-  result
-end
 
-req_stats = stats(require_times.map { |r| r["elapsed"] })
-features = require_times[0]["features_loaded"]
-per_req_us = (req_stats[:median] / features) * 1_000_000
-puts "  Median: #{fmt(req_stats[:median])} total, %.1fµs/require (%d features) (phase took #{fmt(clock - phase_start)})" % [per_req_us, features]
-puts
+  req_stats = stats(require_times.map { |r| r["elapsed"] })
+  features = require_times[0]["features_loaded"]
+  per_req_us = (req_stats[:median] / features) * 1_000_000
+  puts format(
+    "  Median: %<total>s total, %<per_req>.1fµs/require (%<features>d features) (phase took %<phase>s)",
+    total: fmt(req_stats[:median]), per_req: per_req_us,
+    features: features, phase: fmt(clock - phase_start)
+  )
+  puts
 else
   puts "Phase 4: Per-require (skipped, set BENCH_REQUIRE=1 to enable)"
 end
@@ -363,13 +370,16 @@ breakdown_times = RUNS.times.map do |run|
   result = JSON.parse(rd.read)
   rd.close
   hit = result["index_cache_hit"] ? "HIT" : "MISS"
-  printf "  Run %d: [%s] store_load=%s  index_load=%s  path_entries=%s (%d paths)  total=%s\n",
-         run + 1, hit,
-         fmt(result["store_load"]),
-         fmt(result["index_load"]),
-         fmt(result["path_entries_total"]),
-         result["path_entries_count"],
-         fmt(result["total"])
+  printf(
+    "  Run %<run>d: [%<hit>s] store_load=%<store>s  index_load=%<idx>s  " \
+    "path_entries=%<paths>s (%<count>d paths)  total=%<total>s\n",
+    run: run + 1, hit: hit,
+    store: fmt(result["store_load"]),
+    idx: fmt(result["index_load"]),
+    paths: fmt(result["path_entries_total"]),
+    count: result["path_entries_count"],
+    total: fmt(result["total"])
+  )
   result
 end
 
@@ -377,7 +387,7 @@ puts
 puts "  Breakdown medians:"
 %w[store_load index_load path_entries_total total].each do |key|
   s = stats(breakdown_times.map { |r| r[key] })
-  puts "    %-25s %s" % [key + ":", fmt(s[:median])]
+  puts format("    %-25<key>s %<val>s", key: "#{key}:", val: fmt(s[:median]))
 end
 hits = breakdown_times.count { |r| r["index_cache_hit"] }
 puts "    Index cache hits:         #{hits}/#{breakdown_times.size}"
@@ -391,7 +401,7 @@ puts "=" * 70
 puts "  Baseline (no bootsnap):     #{baseline_stats ? fmt(baseline_stats[:median]) : '(skipped)'}"
 puts "  Cold cache init:            #{cold_stats ? fmt(cold_stats[:median]) : '(skipped)'}"
 puts "  Warm cache init:            #{fmt(warm_total_stats[:median])}"
-puts "  Per-require (warm):         #{per_req_us ? '%.1fµs' % per_req_us : '(skipped)'}"
+puts "  Per-require (warm):         #{per_req_us ? format('%.1fµs', per_req_us) : '(skipped)'}"
 puts
 puts "  Warm init is overhead on every boot even when nothing changed."
 puts "  Optimization target: reduce warm init from #{fmt(warm_total_stats[:median])} toward zero."

@@ -24,7 +24,7 @@ def generate_gems(num_gems:, files_per_gem:, target_dir:)
   FileUtils.rm_rf(target_dir)
   FileUtils.mkdir_p(target_dir)
 
-  gem_names = num_gems.times.map { |i| "fakegem_%04d" % i }
+  gem_names = num_gems.times.map { |i| format("fakegem_%04d", i) }
   load_paths = []
 
   gem_names.each_with_index do |name, gem_idx|

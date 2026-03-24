@@ -9,7 +9,8 @@ module Bootsnap
 
     Error = Class.new(StandardError)
 
-    def self.setup(cache_dir:, iseq:, yaml:, json: (json_unset = true), readonly: false, revalidation: false, development_mode: false)
+    def self.setup(cache_dir:, iseq:, yaml:, json: (json_unset = true),
+                   readonly: false, revalidation: false, development_mode: false)
       unless json_unset
         warn("Bootsnap::CompileCache.setup `json` argument is deprecated and has no effect")
       end

@@ -23,11 +23,11 @@ end
 
 def fmt(seconds)
   if seconds < 0.001
-    "%.1fµs" % (seconds * 1_000_000)
+    format("%.1fµs", seconds * 1_000_000)
   elsif seconds < 1
-    "%.2fms" % (seconds * 1000)
+    format("%.2fms", seconds * 1000)
   else
-    "%.3fs" % seconds
+    format("%.3fs", seconds)
   end
 end
 
@@ -98,7 +98,7 @@ individual_times = RUNS.times.map do |run|
     FAKE_GEM_NAMES.each { |name| require name }
     elapsed = clock - t0
     GC.enable
-    wr.write(JSON.dump({ elapsed: elapsed, features: $LOADED_FEATURES.size }))
+    wr.write(JSON.dump({elapsed: elapsed, features: $LOADED_FEATURES.size}))
     wr.close
     exit!(0)
   end
@@ -106,7 +106,8 @@ individual_times = RUNS.times.map do |run|
   Process.wait(pid)
   result = JSON.parse(rd.read)
   rd.close
-  printf "  Run %d: %s (%d features)\n", run + 1, fmt(result["elapsed"]), result["features"]
+  printf "  Run %<run>d: %<time>s (%<features>d features)\n",
+         run: run + 1, time: fmt(result["elapsed"]), features: result["features"]
   result["elapsed"]
 end
 
@@ -138,7 +139,7 @@ cold_times = RUNS.times.map do |run|
     GC.enable
 
     bundles = Dir.glob(File.join(CACHE_DIR, "bootsnap", "iseq-bundles", "**/*")).count { |f| File.file?(f) }
-    wr.write(JSON.dump({ elapsed: elapsed, features: $LOADED_FEATURES.size, bundles: bundles }))
+    wr.write(JSON.dump({elapsed: elapsed, features: $LOADED_FEATURES.size, bundles: bundles}))
     wr.close
     exit!(0)
   end
@@ -146,8 +147,8 @@ cold_times = RUNS.times.map do |run|
   Process.wait(pid)
   result = JSON.parse(rd.read)
   rd.close
-  printf "  Run %d: %s (%d features, %d bundles built)\n",
-         run + 1, fmt(result["elapsed"]), result["features"], result["bundles"]
+  printf "  Run %<run>d: %<time>s (%<features>d features, %<bundles>d bundles built)\n",
+         run: run + 1, time: fmt(result["elapsed"]), features: result["features"], bundles: result["bundles"]
   result["elapsed"]
 end
 
@@ -174,7 +175,7 @@ warm_times = RUNS.times.map do |run|
     FAKE_GEM_NAMES.each { |name| require name }
     elapsed = clock - t0
     GC.enable
-    wr.write(JSON.dump({ elapsed: elapsed, features: $LOADED_FEATURES.size }))
+    wr.write(JSON.dump({elapsed: elapsed, features: $LOADED_FEATURES.size}))
     wr.close
     exit!(0)
   end
@@ -182,7 +183,8 @@ warm_times = RUNS.times.map do |run|
   Process.wait(pid)
   result = JSON.parse(rd.read)
   rd.close
-  printf "  Run %d: %s (%d features)\n", run + 1, fmt(result["elapsed"]), result["features"]
+  printf "  Run %<run>d: %<time>s (%<features>d features)\n",
+         run: run + 1, time: fmt(result["elapsed"]), features: result["features"]
   result["elapsed"]
 end
 
@@ -196,9 +198,12 @@ puts "=" * 70
 puts "Summary"
 puts "=" * 70
 puts "  Individual cache (current):       #{fmt(individual_median)}"
-puts "  Per-gem bundles (cold auto-build): #{fmt(cold_median)}  (%.1fx vs individual)" % [individual_median / cold_median]
-puts "  Per-gem bundles (warm):            #{fmt(warm_median)}  (%.1fx vs individual)" % [individual_median / warm_median]
+puts format("  Per-gem bundles (cold auto-build): %<time>s  (%<ratio>.1fx vs individual)",
+            time: fmt(cold_median), ratio: individual_median / cold_median)
+puts format("  Per-gem bundles (warm):            %<time>s  (%<ratio>.1fx vs individual)",
+            time: fmt(warm_median), ratio: individual_median / warm_median)
 bundles_count = Dir.glob(File.join(CACHE_DIR, "bootsnap", "iseq-bundles", "**/*")).count { |f| File.file?(f) }
-bundles_size = Dir.glob(File.join(CACHE_DIR, "bootsnap", "iseq-bundles", "**/*")).select { |f| File.file?(f) }.sum { |f| File.size(f) }
+bundles_size = Dir.glob(File.join(CACHE_DIR, "bootsnap", "iseq-bundles", "**/*"))
+  .select { |f| File.file?(f) }.sum { |f| File.size(f) }
 puts "  Bundle files: #{bundles_count}, total #{bundles_size / 1024}KB"
 puts "=" * 70

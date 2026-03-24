@@ -171,7 +171,7 @@ module Bootsnap
       end
 
       # Mini stub_const for non-nested constants
-      def stub_const(owner, const_name, value)
+      def stub_const(_owner, _const_name, _value)
         yield
       end
     end

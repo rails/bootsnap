@@ -35,6 +35,7 @@ module Bootsnap
           return nil
         rescue ArgumentError => error
           return nil if error.message =~ /negative array size/
+
           raise
         end
 

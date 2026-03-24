@@ -24,7 +24,7 @@ module Bootsnap
           @bundles_dir = File.join(parent_dir, BUNDLE_DIR)
           @skip_validation = skip_validation
           @auto_build = auto_build
-          @loaded_bundles = {}  # load_path_entry => GemBundle or :miss
+          @loaded_bundles = {} # load_path_entry => GemBundle or :miss
           @path_to_bundle = {} # resolved absolute path => GemBundle (populated lazily)
           @enabled = true
         end
@@ -62,7 +62,11 @@ module Bootsnap
 
           built = 0
           load_path_entries.each do |entry|
-            entry = File.realpath(entry) rescue next
+            begin
+              entry = File.realpath(entry)
+            rescue StandardError
+              next
+            end
             next unless File.directory?(entry)
 
             source_files = Dir.glob(File.join(entry, "**/*.rb"))
@@ -101,7 +105,7 @@ module Bootsnap
             # Auto-build on first encounter. This makes the precompile step
             # optional — bundles are created lazily on first boot.
             source_files = Dir.glob(File.join(load_path_entry, "**/*.rb"))
-            if source_files.size > 0
+            unless source_files.empty?
               bundle = GemBundle.build(@bundles_dir, load_path_entry, source_files)
             end
           end

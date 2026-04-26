@@ -109,6 +109,8 @@ static bool readonly = false;
 static bool revalidation = false;
 static bool perm_issue = false;
 
+static ID id_storage_to_output, id_input_to_output, id_input_to_storage;
+
 /* Functions exposed as module functions on Bootsnap::CompileCache::Native */
 static VALUE bs_instrumentation_enabled_set(VALUE self, VALUE enabled);
 static VALUE bs_readonly_set(VALUE self, VALUE enabled);
@@ -274,6 +276,10 @@ void
 Init_bootsnap(void)
 {
   rb_mBootsnap = rb_define_module("Bootsnap");
+
+  id_storage_to_output = rb_intern("storage_to_output");
+  id_input_to_output = rb_intern("input_to_output");
+  id_input_to_storage = rb_intern("input_to_storage");
 
   rb_define_singleton_method(rb_mBootsnap, "rb_get_path", bs_rb_get_path, 1);
 
@@ -1186,7 +1192,7 @@ static VALUE
 try_storage_to_output(VALUE arg)
 {
   struct s2o_data * data = (struct s2o_data *)arg;
-  return rb_funcall(data->handler, rb_intern("storage_to_output"), 2, data->storage_data, data->args);
+  return rb_funcall(data->handler, id_storage_to_output, 2, data->storage_data, data->args);
 }
 
 static int
@@ -1218,14 +1224,14 @@ static VALUE
 prot_input_to_output(VALUE arg)
 {
   struct i2o_data * data = (struct i2o_data *)arg;
-  return rb_funcall(data->handler, rb_intern("input_to_output"), 3, data->input_data, data->pathval, data->args);
+  return rb_funcall(data->handler, id_input_to_output, 3, data->input_data, data->pathval, data->args);
 }
 
 static VALUE
 try_input_to_storage(VALUE arg)
 {
   struct i2s_data * data = (struct i2s_data *)arg;
-  return rb_funcall(data->handler, rb_intern("input_to_storage"), 2, data->input_data, data->pathval);
+  return rb_funcall(data->handler, id_input_to_storage, 2, data->input_data, data->pathval);
 }
 
 static int

@@ -1,5 +1,7 @@
 # Unreleased
 
+# 1.24.0
+
 * Added a hook API to customize Ruby compilation.
 
 # 1.23.0

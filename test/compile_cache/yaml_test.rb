@@ -128,7 +128,7 @@ class CompileCacheYAMLTest < Minitest::Test
     end
 
     def test_yaml_input_to_output_safe
-      document = ::Bootsnap::CompileCache::YAML::Psych4::SafeLoad.input_to_output(<<~YAML, {})
+      document = ::Bootsnap::CompileCache::YAML::Psych4::SafeLoad.input_to_output(<<~YAML, "file.yml", {})
         ---
         :foo: 42
         bar: [1]
@@ -141,7 +141,7 @@ class CompileCacheYAMLTest < Minitest::Test
     end
 
     def test_yaml_input_to_output_unsafe
-      document = ::Bootsnap::CompileCache::YAML::Psych4::UnsafeLoad.input_to_output(<<~YAML, {})
+      document = ::Bootsnap::CompileCache::YAML::Psych4::UnsafeLoad.input_to_output(<<~YAML, "file.yml", {})
         ---
         :foo: 42
         bar: [1]
@@ -154,7 +154,7 @@ class CompileCacheYAMLTest < Minitest::Test
     end
   else
     def test_yaml_input_to_output
-      document = ::Bootsnap::CompileCache::YAML::Psych3.input_to_output(<<~YAML, {})
+      document = ::Bootsnap::CompileCache::YAML::Psych3.input_to_output(<<~YAML, "file.yml", {})
         ---
         :foo: 42
         bar: [1]

@@ -70,7 +70,7 @@ class CompileCacheKeyFormatTest < Minitest::Test
     target = Help.set_file("a.rb", "foo = 1")
 
     cache_dir = File.join(@tmp_dir, "compile_cache")
-    actual = Bootsnap::CompileCache::Native.fetch(cache_dir, target, TestHandler, nil)
+    actual = Bootsnap::CompileCache::Native.fetch(cache_dir, nil, target, TestHandler, nil)
     assert_equal("NEATO #{target.upcase}", actual)
 
     entries = Dir["#{cache_dir}/**/*"].select { |f| File.file?(f) }
@@ -80,7 +80,7 @@ class CompileCacheKeyFormatTest < Minitest::Test
     data = File.read(cache_file)
     assert_equal("neato #{target}", data.force_encoding(Encoding::BINARY)[64..])
 
-    actual = Bootsnap::CompileCache::Native.fetch(cache_dir, target, TestHandler, nil)
+    actual = Bootsnap::CompileCache::Native.fetch(cache_dir, nil, target, TestHandler, nil)
     assert_equal("NEATO #{target.upcase}", actual)
   end
 
@@ -90,26 +90,26 @@ class CompileCacheKeyFormatTest < Minitest::Test
 
     target = Help.set_file("a.rb", "foo = 1")
 
-    actual = Bootsnap::CompileCache::Native.fetch(cache_dir, target, TestHandler, nil)
+    actual = Bootsnap::CompileCache::Native.fetch(cache_dir, nil, target, TestHandler, nil)
     assert_equal("NEATO #{target.upcase}", actual)
 
     10.times do
       FileUtils.touch(target, mtime: File.mtime(target) + 42)
-      actual = Bootsnap::CompileCache::Native.fetch(cache_dir, target, TestHandler, nil)
+      actual = Bootsnap::CompileCache::Native.fetch(cache_dir, nil, target, TestHandler, nil)
       assert_equal("NEATO #{target.upcase}", actual)
     end
   end
 
   def test_unexistent_fetch
     assert_raises(Errno::ENOENT) do
-      Bootsnap::CompileCache::Native.fetch(@tmp_dir, "123", Bootsnap::CompileCache::ISeq, nil)
+      Bootsnap::CompileCache::Native.fetch(@tmp_dir, nil, "123", Bootsnap::CompileCache::ISeq, nil)
     end
   end
 
   private
 
   def cache_key_for_file(file)
-    Bootsnap::CompileCache::Native.fetch(@tmp_dir, file, TestHandler, nil)
+    Bootsnap::CompileCache::Native.fetch(@tmp_dir, nil, file, TestHandler, nil)
     data = File.binread(Help.cache_path(@tmp_dir, file))
     data.byteslice(0..31)
   end

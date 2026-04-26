@@ -28,6 +28,7 @@ module Bootsnap
 
           CompileCache::Native.precompile(
             cache_dir,
+            nil,
             path.to_s,
             @implementation,
           )
@@ -175,7 +176,7 @@ module Bootsnap
             result
           end
 
-          def input_to_output(data, kwargs)
+          def input_to_output(data, _path, kwargs)
             ::YAML.unsafe_load(data, **(kwargs || {}))
           end
         end
@@ -215,7 +216,7 @@ module Bootsnap
             end
           end
 
-          def input_to_output(data, kwargs)
+          def input_to_output(data, _path, kwargs)
             ::YAML.load(data, **(kwargs || {}))
           end
         end
@@ -233,6 +234,7 @@ module Bootsnap
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
+              nil,
               File.realpath(path),
               CompileCache::YAML::Psych4::SafeLoad,
               kwargs,
@@ -253,6 +255,7 @@ module Bootsnap
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
+              nil,
               File.realpath(path),
               CompileCache::YAML::Psych4::UnsafeLoad,
               kwargs,
@@ -288,7 +291,7 @@ module Bootsnap
           unpacker.unpack
         end
 
-        def input_to_output(data, kwargs)
+        def input_to_output(data, _path, kwargs)
           ::YAML.load(data, **(kwargs || {}))
         end
 
@@ -305,6 +308,7 @@ module Bootsnap
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
+              nil,
               File.realpath(path),
               CompileCache::YAML::Psych3,
               kwargs,
@@ -325,6 +329,7 @@ module Bootsnap
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
+              nil,
               File.realpath(path),
               CompileCache::YAML::Psych3,
               kwargs,

@@ -1,5 +1,7 @@
 # Unreleased
 
+* Added a hook API to customize Ruby compilation.
+
 # 1.23.0
 
 * Require Ruby 2.7.

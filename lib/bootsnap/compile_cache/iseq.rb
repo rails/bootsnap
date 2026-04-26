@@ -7,7 +7,8 @@ module Bootsnap
   module CompileCache
     module ISeq
       class << self
-        attr_reader(:cache_dir)
+        attr_reader :cache_dir
+        attr_accessor :compiler_selector, :default_compiler
 
         def cache_dir=(cache_dir)
           @cache_dir = cache_dir.end_with?("/") ? "#{cache_dir}iseq" : "#{cache_dir}-iseq"
@@ -18,69 +19,81 @@ module Bootsnap
         end
       end
 
-      has_ruby_bug_18250 = begin # https://bugs.ruby-lang.org/issues/18250
-        if defined? RubyVM::InstructionSequence
-          RubyVM::InstructionSequence.compile("def foo(*); ->{ super }; end; def foo(**); ->{ super }; end").to_binary
-        end
-        false
-      rescue TypeError
-        true
-      end
+      class Compiler
+        attr_reader :namespace, :compile_options
 
-      if has_ruby_bug_18250
-        def self.input_to_storage(_, path)
-          iseq = begin
-            RubyVM::InstructionSequence.compile_file(path)
-          rescue SyntaxError
-            return UNCOMPILABLE # syntax error
+        def initialize(namespace = nil, compile_options = nil)
+          @namespace = namespace
+          @compile_options = compile_options
+        end
+
+        has_ruby_bug_18250 = begin # https://bugs.ruby-lang.org/issues/18250
+          if defined? RubyVM::InstructionSequence
+            RubyVM::InstructionSequence.compile("def foo(*); ->{ super }; end; def foo(**); ->{ super }; end").to_binary
           end
+          false
+        rescue TypeError
+          true
+        end
 
-          begin
-            iseq.to_binary
-          rescue TypeError
-            UNCOMPILABLE # ruby bug #18250
+        if has_ruby_bug_18250
+          def input_to_storage(_, path)
+            iseq = RubyVM::InstructionSequence.compile_file(path, @compile_options)
+
+            begin
+              iseq.to_binary
+            rescue TypeError
+              UNCOMPILABLE # ruby bug #18250
+            end
           end
-        end
-      else
-        def self.input_to_storage(_, path)
-          RubyVM::InstructionSequence.compile_file(path).to_binary
-        rescue SyntaxError
-          UNCOMPILABLE # syntax error
-        end
-      end
-
-      def self.storage_to_output(binary, _args)
-        iseq = RubyVM::InstructionSequence.load_from_binary(binary)
-        binary.clear
-        iseq
-      rescue RuntimeError => error
-        if error.message == "broken binary format"
-          $stderr.puts("[Bootsnap::CompileCache] warning: rejecting broken binary")
-          nil
         else
-          raise
+          def input_to_storage(_, path)
+            RubyVM::InstructionSequence.compile_file(path, @compile_options).to_binary
+          end
+        end
+
+        def storage_to_output(binary, _args)
+          iseq = RubyVM::InstructionSequence.load_from_binary(binary)
+          binary.clear
+          iseq
+        rescue RuntimeError => error
+          if error.message == "broken binary format"
+            $stderr.puts("[Bootsnap::CompileCache] warning: rejecting broken binary")
+            nil
+          else
+            raise
+          end
+        end
+
+        def input_to_output(source, path, _kwargs)
+          RubyVM::InstructionSequence.compile(source, path, path, nil, @compile_options)
         end
       end
+
+      DEFAULT = Compiler.new
+      FROZEN_STRING_LITERAL = Compiler.new("-fstr", {frozen_string_literal: true}.freeze)
+      MUTABLE_STRING_LITERAL = Compiler.new("-no-fstr", {frozen_string_literal: false}.freeze)
+      @default_compiler = DEFAULT
 
       def self.fetch(path, cache_dir: ISeq.cache_dir)
+        compiler = compiler_selector&.call(path) || default_compiler
         Bootsnap::CompileCache::Native.fetch(
           cache_dir,
+          compiler.namespace,
           path.to_s,
-          Bootsnap::CompileCache::ISeq,
+          compiler,
           nil,
         )
       end
 
       def self.precompile(path)
+        compiler = compiler_selector&.call(path) || default_compiler
         Bootsnap::CompileCache::Native.precompile(
           cache_dir,
+          compiler.namespace,
           path.to_s,
-          Bootsnap::CompileCache::ISeq,
+          compiler,
         )
-      end
-
-      def self.input_to_output(_data, _kwargs)
-        nil # ruby handles this
       end
 
       module InstructionSequenceMixin

@@ -38,7 +38,7 @@ module TestHandler
     data.upcase
   end
 
-  def self.input_to_output(_data, _kwargs)
+  def self.input_to_output(_source, _path, _kwargs)
     raise("but why tho")
   end
 end

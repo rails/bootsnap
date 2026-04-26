@@ -114,8 +114,8 @@ static VALUE bs_instrumentation_enabled_set(VALUE self, VALUE enabled);
 static VALUE bs_readonly_set(VALUE self, VALUE enabled);
 static VALUE bs_revalidation_set(VALUE self, VALUE enabled);
 static VALUE bs_compile_option_crc32_set(VALUE self, VALUE crc32_v);
-static VALUE bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE path_v, VALUE handler, VALUE args);
-static VALUE bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE path_v, VALUE handler);
+static VALUE bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler, VALUE args);
+static VALUE bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler);
 
 /* Helpers */
 enum cache_status {
@@ -123,7 +123,7 @@ enum cache_status {
   hit,
   stale,
 };
-static void bs_cache_path(const char * cachedir, const VALUE path, char (* cache_path)[MAX_CACHEPATH_SIZE]);
+static void bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_path)[MAX_CACHEPATH_SIZE]);
 static int bs_read_key(int fd, struct bs_cache_key * key);
 static enum cache_status cache_key_equal_fast_path(struct bs_cache_key * k1, struct bs_cache_key * k2);
 static int cache_key_equal_slow_path(struct bs_cache_key * current_key, struct bs_cache_key * cached_key, const VALUE input_data);
@@ -143,7 +143,7 @@ static uint32_t get_ruby_platform(void);
  */
 static int bs_storage_to_output(VALUE handler, VALUE args, VALUE storage_data, VALUE * output_data);
 static VALUE prot_input_to_output(VALUE arg);
-static void bs_input_to_output(VALUE handler, VALUE args, VALUE input_data, VALUE * output_data, int * exception_tag);
+static void bs_input_to_output(VALUE handler, VALUE args, VALUE input_data, VALUE pathval, VALUE * output_data, int * exception_tag);
 static int bs_input_to_storage(VALUE handler, VALUE args, VALUE input_data, VALUE pathval, VALUE * storage_data);
 struct s2o_data;
 struct i2o_data;
@@ -302,8 +302,8 @@ Init_bootsnap(void)
   rb_define_module_function(rb_mBootsnap, "instrumentation_enabled=", bs_instrumentation_enabled_set, 1);
   rb_define_module_function(rb_mBootsnap_CompileCache_Native, "readonly=", bs_readonly_set, 1);
   rb_define_module_function(rb_mBootsnap_CompileCache_Native, "revalidation=", bs_revalidation_set, 1);
-  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "fetch", bs_rb_fetch, 4);
-  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "precompile", bs_rb_precompile, 3);
+  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "fetch", bs_rb_fetch, 5);
+  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "precompile", bs_rb_precompile, 4);
   rb_define_module_function(rb_mBootsnap_CompileCache_Native, "compile_option_crc32=", bs_compile_option_crc32_set, 1);
 
   current_umask = umask(0777);
@@ -420,13 +420,28 @@ get_ruby_platform(void)
  * The path will look something like: <cachedir>/12/34567890abcdef
  */
 static void
-bs_cache_path(const char * cachedir, const VALUE path, char (* cache_path)[MAX_CACHEPATH_SIZE])
+bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_path)[MAX_CACHEPATH_SIZE])
 {
-  uint64_t hash = fnv1a_64(path);
+  FilePathValue(path_v);
+
+  Check_Type(cachedir_v, T_STRING);
+  Check_Type(path_v, T_STRING);
+  if (!NIL_P(namespace_v)) {
+    Check_Type(namespace_v, T_STRING);
+  }
+
+  if (RSTRING_LEN(cachedir_v) > MAX_CACHEDIR_SIZE) {
+    rb_raise(rb_eArgError, "cachedir too long");
+  }
+
+  const char * cachedir = RSTRING_PTR(cachedir_v);
+  const char * namespace = NIL_P(namespace_v) ? "" : RSTRING_PTR(namespace_v);
+
+  uint64_t hash = fnv1a_64(path_v);
   uint8_t first_byte = (hash >> (64 - 8));
   uint64_t remainder = hash & 0x00ffffffffffffff;
 
-  sprintf(*cache_path, "%s/%02"PRIx8"/%014"PRIx64, cachedir, first_byte, remainder);
+  sprintf(*cache_path, "%s%s/%02"PRIx8"/%014"PRIx64, cachedir, namespace, first_byte, remainder);
 }
 
 /*
@@ -498,25 +513,14 @@ static void bs_cache_key_digest(struct bs_cache_key *key,
  * conversions on the ruby VALUE arguments before passing them along.
  */
 static VALUE
-bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE path_v, VALUE handler, VALUE args)
+bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler, VALUE args)
 {
-  FilePathValue(path_v);
-
-  Check_Type(cachedir_v, T_STRING);
-  Check_Type(path_v, T_STRING);
-
-  if (RSTRING_LEN(cachedir_v) > MAX_CACHEDIR_SIZE) {
-    rb_raise(rb_eArgError, "cachedir too long");
-  }
-
-  char * cachedir = RSTRING_PTR(cachedir_v);
-  char * path     = RSTRING_PTR(path_v);
   char cache_path[MAX_CACHEPATH_SIZE];
 
   /* generate cache path to cache_path */
-  bs_cache_path(cachedir, path_v, &cache_path);
+  bs_cache_path(cachedir_v, namespace_v, path_v, &cache_path);
 
-  return bs_fetch(path, path_v, cache_path, handler, args);
+  return bs_fetch(RSTRING_PTR(path_v), path_v, cache_path, handler, args);
 }
 
 /*
@@ -525,25 +529,13 @@ bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE path_v, VALUE handler, VALUE arg
  * and doesn't return the content.
  */
 static VALUE
-bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE path_v, VALUE handler)
+bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler)
 {
-  FilePathValue(path_v);
-
-  Check_Type(cachedir_v, T_STRING);
-  Check_Type(path_v, T_STRING);
-
-  if (RSTRING_LEN(cachedir_v) > MAX_CACHEDIR_SIZE) {
-    rb_raise(rb_eArgError, "cachedir too long");
-  }
-
-  char * cachedir = RSTRING_PTR(cachedir_v);
-  char * path     = RSTRING_PTR(path_v);
   char cache_path[MAX_CACHEPATH_SIZE];
-
   /* generate cache path to cache_path */
-  bs_cache_path(cachedir, path_v, &cache_path);
+  bs_cache_path(cachedir_v, namespace_v, path_v, &cache_path);
 
-  return bs_precompile(path, path_v, cache_path, handler);
+  return bs_precompile(RSTRING_PTR(path_v), path_v, cache_path, handler);
 }
 
 static int bs_open_noatime(const char *path, int flags) {
@@ -963,7 +955,7 @@ bs_fetch(char * path, VALUE path_v, char * cache_path, VALUE handler, VALUE args
         exception_message = path_v;
         goto fail_errno;
       }
-      bs_input_to_output(handler, args, input_data, &output_data, &exception_tag);
+      bs_input_to_output(handler, args, input_data, path_v, &output_data, &exception_tag);
       if (exception_tag != 0) goto raise;
       goto succeed;
     } else if (res == CACHE_MISS || res == CACHE_STALE) valid_cache = 0;
@@ -989,7 +981,7 @@ bs_fetch(char * path, VALUE path_v, char * cache_path, VALUE handler, VALUE args
   /* If input_to_storage raised Bootsnap::CompileCache::Uncompilable, don't try
    * to cache anything; just return input_to_output(input_data) */
   if (storage_data == rb_cBootsnap_CompileCache_UNCOMPILABLE) {
-    bs_input_to_output(handler, args, input_data, &output_data, &exception_tag);
+    bs_input_to_output(handler, args, input_data, path_v, &output_data, &exception_tag);
     if (exception_tag != 0) goto raise;
     goto succeed;
   }
@@ -1009,7 +1001,7 @@ bs_fetch(char * path, VALUE path_v, char * cache_path, VALUE handler, VALUE args
 
   if (output_data == rb_cBootsnap_CompileCache_UNCOMPILABLE) {
     /* If storage_to_output returned `Uncompilable` we fallback to `input_to_output` */
-    bs_input_to_output(handler, args, input_data, &output_data, &exception_tag);
+    bs_input_to_output(handler, args, input_data, path_v, &output_data, &exception_tag);
     if (exception_tag != 0) goto raise;
   } else if (NIL_P(output_data)) {
     /* If output_data is nil, delete the cache entry and generate the output
@@ -1023,7 +1015,7 @@ bs_fetch(char * path, VALUE path_v, char * cache_path, VALUE handler, VALUE args
         goto fail_errno;
       }
     }
-    bs_input_to_output(handler, args, input_data, &output_data, &exception_tag);
+    bs_input_to_output(handler, args, input_data, path_v, &output_data, &exception_tag);
     if (exception_tag != 0) goto raise;
   }
 
@@ -1181,6 +1173,7 @@ struct i2o_data {
   VALUE handler;
   VALUE args;
   VALUE input_data;
+  VALUE pathval;
 };
 
 struct i2s_data {
@@ -1210,12 +1203,13 @@ bs_storage_to_output(VALUE handler, VALUE args, VALUE storage_data, VALUE * outp
 }
 
 static void
-bs_input_to_output(VALUE handler, VALUE args, VALUE input_data, VALUE * output_data, int * exception_tag)
+bs_input_to_output(VALUE handler, VALUE args, VALUE input_data, VALUE path_v, VALUE * output_data, int * exception_tag)
 {
   struct i2o_data i2o_data = {
     .handler    = handler,
     .args       = args,
     .input_data = input_data,
+    .pathval    = path_v,
   };
   *output_data = rb_protect(prot_input_to_output, (VALUE)&i2o_data, exception_tag);
 }
@@ -1224,7 +1218,7 @@ static VALUE
 prot_input_to_output(VALUE arg)
 {
   struct i2o_data * data = (struct i2o_data *)arg;
-  return rb_funcall(data->handler, rb_intern("input_to_output"), 2, data->input_data, data->args);
+  return rb_funcall(data->handler, rb_intern("input_to_output"), 3, data->input_data, data->pathval, data->args);
 }
 
 static VALUE

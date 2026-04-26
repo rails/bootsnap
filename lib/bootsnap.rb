@@ -43,6 +43,13 @@ module Bootsnap
       @instrumentation.call(event, path)
     end
 
+    def load_config
+      config_path = File.expand_path(ENV["BOOTSNAP_CONFIG"] || "config/bootsnap.rb")
+      if File.exist?(config_path)
+        require(config_path)
+      end
+    end
+
     def setup(
       cache_dir:,
       development_mode: true,
@@ -76,6 +83,28 @@ module Bootsnap
         readonly: readonly,
         revalidation: revalidation,
       )
+
+      load_config
+    end
+
+    def enable_frozen_string_literal(app_only: false)
+      if app_only
+        gems_root = File.join(Bundler.bundle_path.cleanpath, "")
+        app_root =  File.join(Dir.pwd, "")
+        Bootsnap::CompileCache::ISeq.default_compiler = Bootsnap::CompileCache::ISeq::DEFAULT
+        Bootsnap::CompileCache::ISeq.compiler_selector = lambda { |path|
+          # Enable `frozen_string_literal: true` for app code, but not gems.
+
+          if path.start_with?(app_root) && !path.start_with?(gems_root)
+            Bootsnap::CompileCache::ISeq::FROZEN_STRING_LITERAL
+          else
+            Bootsnap::CompileCache::ISeq::DEFAULT
+          end
+        }
+      else
+        Bootsnap::CompileCache::ISeq.compiler_selector = nil
+        Bootsnap::CompileCache::ISeq.default_compiler = Bootsnap::CompileCache::ISeq::FROZEN_STRING_LITERAL
+      end
     end
 
     def unload_cache!

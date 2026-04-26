@@ -75,6 +75,7 @@ well together.
 `require 'bootsnap/setup'` behavior can be changed using environment variables:
 
 - `BOOTSNAP_CACHE_DIR` allows to define the cache location.
+- `BOOTSNAP_CONFIG` allows to change the default config location (`config/bootsnap.rb`).
 - `DISABLE_BOOTSNAP` allows to entirely disable bootsnap.
 - `DISABLE_BOOTSNAP_LOAD_PATH_CACHE` allows to disable load path caching.
 - `DISABLE_BOOTSNAP_COMPILE_CACHE` allows to disable ISeq and YAML caches.
@@ -318,6 +319,34 @@ open    /c/nope.bundle -> -1
 
 ```
 # (nothing!)
+```
+
+## Custom Compilers
+
+Bootsnap allows substituing the default Ruby compiler by another one.
+This can be configured from the bootsnap config file (defaults to `config/bootsnap.rb`).
+
+The main use case is to programmatically enable frozen string literals for your project without impacting dependencies:
+
+```ruby
+Bootsnap.enable_frozen_string_literal(app_only: true)
+```
+
+But it can also be used for more fine grained logic, or to implement all sort of Ruby code preprocessing:
+
+```ruby
+# config/bootsnap.rb
+gems_root = File.join(Bundler.bundle_path.cleanpath, "")
+app_root =  File.join(Dir.pwd, "")
+Bootsnap::CompileCache::ISeq.compiler_selector = ->(path) do
+  # Enable `frozen_string_literal: true` for app code, but not gems.
+
+  if path.start_with?(app_root) && !path.start_with?(gems_root)
+    Bootsnap::CompileCache::ISeq::FROZEN_STRING_LITERAL
+  else
+    Bootsnap::CompileCache::ISeq::DEFAULT
+  end
+end
 ```
 
 ## Precompilation

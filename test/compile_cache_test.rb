@@ -83,8 +83,8 @@ class CompileCacheTest < Minitest::Test
     output = RubyVM::InstructionSequence.load_from_binary(storage)
     # This doesn't really *prove* the file is only read once, but
     # it at least asserts the input is only cached once.
-    Bootsnap::CompileCache::ISeq.expects(:input_to_storage).times(1).returns(storage)
-    Bootsnap::CompileCache::ISeq.expects(:storage_to_output).times(2).returns(output)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).times(1).returns(storage)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:storage_to_output).times(2).returns(output)
     load(path)
     load(path)
   end
@@ -101,8 +101,8 @@ class CompileCacheTest < Minitest::Test
     path = Help.set_file("a.rb", "a = a = 3", 100)
     storage = RubyVM::InstructionSequence.compile_file(path).to_binary
     output = RubyVM::InstructionSequence.load_from_binary(storage)
-    Bootsnap::CompileCache::ISeq.expects(:input_to_storage).times(1).returns(storage)
-    Bootsnap::CompileCache::ISeq.expects(:storage_to_output).times(2).returns(output)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).times(1).returns(storage)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:storage_to_output).times(2).returns(output)
 
     load(path)
     Help.set_file(path, "a = a = 4", 100)
@@ -114,8 +114,8 @@ class CompileCacheTest < Minitest::Test
     storage = RubyVM::InstructionSequence.compile_file(path).to_binary
     output = RubyVM::InstructionSequence.load_from_binary(storage)
     # Totally lies the second time but that's not the point.
-    Bootsnap::CompileCache::ISeq.expects(:input_to_storage).times(2).returns(storage)
-    Bootsnap::CompileCache::ISeq.expects(:storage_to_output).times(2).returns(output)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).times(2).returns(storage)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:storage_to_output).times(2).returns(output)
 
     load(path)
     Help.set_file(path, "a = a = 2", 101)
@@ -127,8 +127,8 @@ class CompileCacheTest < Minitest::Test
     storage = RubyVM::InstructionSequence.compile_file(path).to_binary
     output = RubyVM::InstructionSequence.load_from_binary(storage)
     # Totally lies the second time but that's not the point.
-    Bootsnap::CompileCache::ISeq.expects(:input_to_storage).times(2).returns(storage)
-    Bootsnap::CompileCache::ISeq.expects(:storage_to_output).times(2).returns(output)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).times(2).returns(storage)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:storage_to_output).times(2).returns(output)
 
     load(path)
     Help.set_file(path, "a = 33", 100)
@@ -140,9 +140,9 @@ class CompileCacheTest < Minitest::Test
 
     path = Help.set_file("a.rb", "a = a = 3", 100)
     output = RubyVM::InstructionSequence.compile_file(path)
-    Bootsnap::CompileCache::ISeq.expects(:input_to_storage).never
-    Bootsnap::CompileCache::ISeq.expects(:storage_to_output).never
-    Bootsnap::CompileCache::ISeq.expects(:input_to_output).once.returns(output)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).never
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:storage_to_output).never
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_output).once.returns(output)
 
     load(path)
   end
@@ -154,9 +154,9 @@ class CompileCacheTest < Minitest::Test
     Bootsnap::CompileCache::Native.readonly = true
 
     output = RubyVM::InstructionSequence.compile_file(path)
-    Bootsnap::CompileCache::ISeq.expects(:input_to_storage).never
-    Bootsnap::CompileCache::ISeq.expects(:storage_to_output).once.returns(output)
-    Bootsnap::CompileCache::ISeq.expects(:input_to_output).never
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).never
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:storage_to_output).once.returns(output)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_output).never
 
     load(path)
   end
@@ -193,9 +193,9 @@ class CompileCacheTest < Minitest::Test
     Bootsnap::CompileCache::Native.readonly = true
 
     output = RubyVM::InstructionSequence.compile_file(path)
-    Bootsnap::CompileCache::ISeq.expects(:input_to_storage).never
-    Bootsnap::CompileCache::ISeq.expects(:storage_to_output).once.returns(output)
-    Bootsnap::CompileCache::ISeq.expects(:input_to_output).never
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).never
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:storage_to_output).once.returns(output)
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_output).never
 
     FileUtils.touch(path, mtime: File.mtime(path) + 50)
 

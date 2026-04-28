@@ -1,5 +1,10 @@
 # Unreleased
 
+* Fix encoding of Ruby source files loaded when `BOOTSNAP_READONLY` is set.
+  Files would incorectly be loaded in `ASCII-8BIT` causing literal strings outside
+  the pure ASCII range to have `ASCII-8BIT` encoding instead of `UTF-8`.
+  This bug was introduced in `1.24.0`.
+
 # 1.24.0
 
 * Added a hook API to customize Ruby compilation.

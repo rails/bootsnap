@@ -70,6 +70,29 @@ module Bootsnap
         end
       end
 
+      class CompilerNamespace
+        def initialize(namespace, compiler)
+          @namespace = namespace
+          @compiler = compiler
+        end
+
+        def namespace
+          "#{@compiler.namespace}#{@namespace}"
+        end
+
+        def input_to_output(...)
+          @compiler.input_to_output(...)
+        end
+
+        def input_to_storage(...)
+          @compiler.input_to_storage(...)
+        end
+
+        def storage_to_output(...)
+          @compiler.storage_to_output(...)
+        end
+      end
+
       DEFAULT = Compiler.new
       FROZEN_STRING_LITERAL = Compiler.new("-fstr", {frozen_string_literal: true}.freeze)
       MUTABLE_STRING_LITERAL = Compiler.new("-no-fstr", {frozen_string_literal: false}.freeze)
@@ -77,6 +100,10 @@ module Bootsnap
 
       def self.fetch(path, cache_dir: ISeq.cache_dir)
         compiler = compiler_selector&.call(path) || default_compiler
+        # Having coverage enabled prevents iseq dumping/loading.
+        if defined?(Coverage) && Coverage.running?
+          compiler = CompilerNamespace.new("-cov", compiler)
+        end
         Bootsnap::CompileCache::Native.fetch(
           cache_dir,
           compiler.namespace,
@@ -98,9 +125,6 @@ module Bootsnap
 
       module InstructionSequenceMixin
         def load_iseq(path)
-          # Having coverage enabled prevents iseq dumping/loading.
-          return nil if defined?(Coverage) && Coverage.running?
-
           Bootsnap::CompileCache::ISeq.fetch(path.to_s)
         rescue RuntimeError => error
           if error.message =~ /unmatched platform/

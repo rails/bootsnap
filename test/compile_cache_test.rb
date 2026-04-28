@@ -23,7 +23,6 @@ class CompileCacheTest < Minitest::Test
 
   def test_coverage_running
     require "coverage"
-    Bootsnap::CompileCache::ISeq.expects(:fetch).times(0)
     begin
       Coverage.start
       path = Help.set_file("a.rb", "a = a = 3", 100)

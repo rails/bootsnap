@@ -1,5 +1,11 @@
 # Unreleased
 
+# 1.24.2
+
+* Workaround two Ruby bugs in `RubyVM::InstructionSequence.compile_file`, that were causing
+  files to be loaded with the old Ruby parser instead of Prism, causing issues with some pattern matching syntax.
+  Ref: https://bugs.ruby-lang.org/issues/22023
+
 # 1.24.1
 
 * Fix encoding of Ruby source files loaded when `BOOTSNAP_READONLY` is set.

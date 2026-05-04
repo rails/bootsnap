@@ -36,19 +36,47 @@ module Bootsnap
           true
         end
 
+        has_ruby_bug_22023 = if defined?(RubyVM::InstructionSequence) && RubyVM::InstructionSequence.respond_to?(:compile_file_prism)
+          begin
+            RubyVM::InstructionSequence.compile_file(File.expand_path("../ruby_bug_22023_canary.rb", __FILE__))
+            false
+          rescue SyntaxError
+            true
+          end
+        end
+
+        if has_ruby_bug_22023 && RUBY_DESCRIPTION.include?("+PRISM")
+          module PatchRubyBug22023
+            def compile_file(path, options = nil)
+              compile_file_prism(path, options)
+            end
+
+            has_ruby_bug_22023_bis = !RubyVM::InstructionSequence.compile_file_prism(
+              File.expand_path("../ruby_bug_22023_canary.rb", __FILE__),
+              {frozen_string_literal: true},
+            ).eval.frozen?
+
+            if has_ruby_bug_22023_bis
+              def compile_file_prism(path, options = nil)
+                compile_prism(::File.read(path), path, path, nil, options)
+              end
+            end
+          end
+          RubyVM::InstructionSequence.singleton_class.prepend(PatchRubyBug22023)
+        end
+
         if has_ruby_bug_18250
           def input_to_storage(_, path)
             iseq = RubyVM::InstructionSequence.compile_file(path, @compile_options)
-
-            begin
-              iseq.to_binary
-            rescue TypeError
-              UNCOMPILABLE # ruby bug #18250
-            end
+            iseq.to_binary
+          rescue TypeError, SyntaxError # Ruby [Bug #18250] & [Bug #22023]
+            UNCOMPILABLE
           end
         else
           def input_to_storage(_, path)
             RubyVM::InstructionSequence.compile_file(path, @compile_options).to_binary
+          rescue SyntaxError # Ruby [Bug #22023]
+            UNCOMPILABLE
           end
         end
 

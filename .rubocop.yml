@@ -140,6 +140,9 @@ Style/TrailingCommaInArrayLiteral:
 Style/TrailingCommaInArguments:
   EnforcedStyleForMultiline: comma
 
+Style/ExpandPathArguments:
+  Enabled: false
+
 Style/SymbolArray:
   Enabled: false
 

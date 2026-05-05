@@ -1,5 +1,8 @@
 # Unreleased
 
+* Fix the `1.24.2` workaround to parse Ruby files with UTF-8 even when the `LANG` environment variable
+  is unset or set to `C`.
+
 # 1.24.2
 
 * Workaround two Ruby bugs in `RubyVM::InstructionSequence.compile_file`, that were causing

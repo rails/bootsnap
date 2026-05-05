@@ -58,7 +58,7 @@ module Bootsnap
 
             if has_ruby_bug_22023_bis
               def compile_file_prism(path, options = nil)
-                compile_prism(::File.read(path), path, path, nil, options)
+                compile_prism(::File.read(path, encoding: Encoding::UTF_8), path, path, nil, options)
               end
             end
           end

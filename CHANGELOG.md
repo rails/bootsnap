@@ -1,5 +1,7 @@
 # Unreleased
 
+# 1.24.3
+
 * Fix the `1.24.2` workaround to parse Ruby files with UTF-8 even when the `LANG` environment variable
   is unset or set to `C`.
 

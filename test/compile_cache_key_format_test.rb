@@ -11,24 +11,19 @@ class CompileCacheKeyFormatTest < Minitest::Test
   include TmpdirHelper
 
   R = {
-    version: 0...4,
-    ruby_platform: 4...8,
-    compile_option: 8...12,
-    ruby_revision: 12...16,
-    size: 16...24,
-    mtime: 24...32,
-    data_size: 32...40,
+    ruby_version_digest: 0...8,
+    size: 8...16,
+    mtime: 16...24,
+    data_size: 24...32,
+    digest: 32...40,
+    compile_option: 40...44,
+    digest_set: 44...48,
   }.freeze
+  CACHE_KEY_SIZE = 48
 
   def teardown
     Bootsnap::CompileCache::Native.revalidation = false
     super
-  end
-
-  def test_key_version
-    key = cache_key_for_file(FILE)
-    exp = [6].pack("L")
-    assert_equal(exp, key[R[:version]])
   end
 
   def test_key_compile_option_stable
@@ -42,14 +37,11 @@ class CompileCacheKeyFormatTest < Minitest::Test
     RubyVM::InstructionSequence.compile_option = {tailcall_optimization: false}
   end
 
-  def test_key_ruby_revision
+  def test_key_ruby_version_digest
     key = cache_key_for_file(FILE)
-    exp = if RUBY_REVISION.is_a?(String)
-      [Help.fnv1a_64(RUBY_REVISION) >> 32].pack("L")
-    else
-      [RUBY_REVISION].pack("L")
-    end
-    assert_equal(exp, key[R[:ruby_revision]])
+    hash = Help.fnv1a_64(RUBY_DESCRIPTION)
+    hash = Help.fnv1a_64_iter(hash, [7].pack("L"))
+    assert_equal([hash].pack("Q"), key[R[:ruby_version_digest]])
   end
 
   def test_key_size
@@ -78,7 +70,7 @@ class CompileCacheKeyFormatTest < Minitest::Test
     cache_file = entries.first
 
     data = File.read(cache_file)
-    assert_equal("neato #{target}", data.force_encoding(Encoding::BINARY)[64..])
+    assert_equal("neato #{target}", data.b[CACHE_KEY_SIZE..])
 
     actual = Bootsnap::CompileCache::Native.fetch(cache_dir, nil, target, TestHandler, nil)
     assert_equal("NEATO #{target.upcase}", actual)
@@ -111,6 +103,6 @@ class CompileCacheKeyFormatTest < Minitest::Test
   def cache_key_for_file(file)
     Bootsnap::CompileCache::Native.fetch(@tmp_dir, nil, file, TestHandler, nil)
     data = File.binread(Help.cache_path(@tmp_dir, file))
-    data.byteslice(0..31)
+    data.byteslice(0...CACHE_KEY_SIZE)
   end
 end

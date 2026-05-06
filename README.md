@@ -243,7 +243,7 @@ is a cache key including several fields:
 * `ruby_version_digest`, a digest of:
   * The `RUBY_DESCRIPTION` constant e.g. `"ruby 4.0.2 (2026-03-17 revision d3da9fec82) +PRISM [arm64-darwin25]"`.
   * Bootsnap's cache version. Hardcoded in bootsnap. Essentially a schema version;
-* `compile_option`, which changes with `RubyVM::InstructionSequence.compile_option` does;
+  * The content of `RubyVM::InstructionSequence.compile_option`.
 * `size`, the size of the source file;
 * `digest`, a fnv1a_64 hash of the source file;
 * `mtime`, the last-modification timestamp of the source file when it was compiled; and

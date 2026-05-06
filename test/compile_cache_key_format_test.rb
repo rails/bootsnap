@@ -16,10 +16,8 @@ class CompileCacheKeyFormatTest < Minitest::Test
     mtime: 16...24,
     data_size: 24...32,
     digest: 32...40,
-    compile_option: 40...44,
-    digest_set: 44...48,
   }.freeze
-  CACHE_KEY_SIZE = 48
+  CACHE_KEY_SIZE = 40
 
   def teardown
     Bootsnap::CompileCache::Native.revalidation = false
@@ -31,16 +29,19 @@ class CompileCacheKeyFormatTest < Minitest::Test
     k2 = cache_key_for_file(FILE)
     RubyVM::InstructionSequence.compile_option = {tailcall_optimization: true}
     k3 = cache_key_for_file(FILE)
-    assert_equal(k1[R[:compile_option]], k2[R[:compile_option]])
-    refute_equal(k1[R[:compile_option]], k3[R[:compile_option]])
+    assert_equal(k1[R[:ruby_version_digest]], k2[R[:ruby_version_digest]])
+    refute_equal(k1[R[:ruby_version_digest]], k3[R[:ruby_version_digest]])
   ensure
     RubyVM::InstructionSequence.compile_option = {tailcall_optimization: false}
   end
 
   def test_key_ruby_version_digest
+    Bootsnap::CompileCache::ISeq.compile_option_updated
+
     key = cache_key_for_file(FILE)
     hash = Help.fnv1a_64(RUBY_DESCRIPTION)
     hash = Help.fnv1a_64_iter(hash, [7].pack("L"))
+    hash = Help.fnv1a_64_iter(hash, [Zlib.crc32(RubyVM::InstructionSequence.compile_option.inspect)].pack("L"))
     assert_equal([hash].pack("Q"), key[R[:ruby_version_digest]])
   end
 

@@ -40,7 +40,7 @@
 #define MAX_CACHEPATH_SIZE 1000
 #define MAX_CACHEDIR_SIZE  981
 
-#define KEY_SIZE 48
+#define KEY_SIZE 40
 
 #define MAX_CREATE_TEMPFILE_ATTEMPT 3
 
@@ -66,8 +66,6 @@ struct bs_cache_key {
   uint64_t mtime;
   uint64_t data_size;
   uint64_t digest;
-  uint32_t compile_option;
-  uint32_t digest_set; // boolean but serves as padding
 } __attribute__((packed));
 
 /*
@@ -84,10 +82,11 @@ STATIC_ASSERT(sizeof(struct bs_cache_key) == KEY_SIZE);
 static const uint32_t bootsnap_cache_version = 7;
 
 /* Invalidates cache when switching ruby version, platform or ABI */
-static uint64_t current_ruby_version_digest = 0;
+static uint64_t base_ruby_version_digest = 0;
 
-/* Invalidates cache when RubyVM::InstructionSequence.compile_option changes */
-static uint32_t current_compile_option_crc32 = 0;
+// `base_ruby_version_digest` combined with RubyVM::InstructionSequence.compile_option
+// Invalidates cache when RubyVM::InstructionSequence.compile_option changes
+static uint64_t current_ruby_version_digest = 0;
 
 /* Current umask */
 static mode_t current_umask;
@@ -288,7 +287,7 @@ Init_bootsnap(void)
   rb_cBootsnap_CompileCache_UNCOMPILABLE = rb_const_get(rb_mBootsnap_CompileCache, rb_intern("UNCOMPILABLE"));
   rb_global_variable(&rb_cBootsnap_CompileCache_UNCOMPILABLE);
 
-  current_ruby_version_digest = get_ruby_version_digest();
+  base_ruby_version_digest = get_ruby_version_digest();
 
   instrumentation_method = rb_intern("_instrument");
 
@@ -337,23 +336,6 @@ bs_revalidation_set(VALUE self, VALUE enabled)
   return enabled;
 }
 
-/*
- * Bootsnap's ruby code registers a hook that notifies us via this function
- * when compile_option changes. These changes invalidate all existing caches.
- *
- * Note that on 32-bit platforms, a CRC32 can't be represented in a Fixnum, but
- * can be represented by a uint.
- */
-static VALUE
-bs_compile_option_crc32_set(VALUE self, VALUE crc32_v)
-{
-  if (!RB_TYPE_P(crc32_v, T_BIGNUM) && !RB_TYPE_P(crc32_v, T_FIXNUM)) {
-    Check_Type(crc32_v, T_FIXNUM);
-  }
-  current_compile_option_crc32 = NUM2UINT(crc32_v);
-  return Qnil;
-}
-
 static uint64_t
 fnv1a_64_iter(uint64_t h, const unsigned char *s, size_t len)
 {
@@ -379,6 +361,24 @@ fnv1a_64_str(const VALUE str)
 {
   uint64_t h = (uint64_t)0xcbf29ce484222325ULL;
   return fnv1a_64_iter_str(h, str);
+}
+
+/*
+ * Bootsnap's ruby code registers a hook that notifies us via this function
+ * when compile_option changes. These changes invalidate all existing caches.
+ *
+ * Note that on 32-bit platforms, a CRC32 can't be represented in a Fixnum, but
+ * can be represented by a uint.
+ */
+static VALUE
+bs_compile_option_crc32_set(VALUE self, VALUE crc32_v)
+{
+  if (!RB_TYPE_P(crc32_v, T_BIGNUM) && !RB_TYPE_P(crc32_v, T_FIXNUM)) {
+    Check_Type(crc32_v, T_FIXNUM);
+  }
+  uint32_t crc32 = (uint32_t)NUM2UINT(crc32_v);
+  current_ruby_version_digest = fnv1a_64_iter(base_ruby_version_digest, (unsigned char *)&crc32, sizeof(crc32));
+  return Qnil;
 }
 
 static uint64_t
@@ -432,7 +432,6 @@ bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_p
 static enum cache_status cache_key_equal_fast_path(struct bs_cache_key *k1,
                                      struct bs_cache_key *k2) {
   if (k1->ruby_version_digest == k2->ruby_version_digest &&
-          k1->compile_option == k2->compile_option &&
           k1->size == k2->size) {
       if (k1->mtime == k2->mtime) {
         return hit;
@@ -477,10 +476,9 @@ static int update_cache_key(struct bs_cache_key *current_key, struct bs_cache_ke
  */
 static void bs_cache_key_digest(struct bs_cache_key *key,
                                 const VALUE input_data) {
-  if (key->digest_set)
+  if (key->digest)
     return;
   key->digest = fnv1a_64_str(input_data);
-  key->digest_set = 1;
 }
 
 /*
@@ -558,11 +556,9 @@ open_current_file(const char * path, struct bs_cache_key * key, const char ** er
   }
 
   key->ruby_version_digest = current_ruby_version_digest;
-  key->compile_option = current_compile_option_crc32;
   key->size           = (uint64_t)statbuf.st_size;
   key->mtime          = (uint64_t)statbuf.st_mtime;
   key->digest         = 0;
-  key->digest_set     = false;
 
   return fd;
 }

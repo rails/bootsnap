@@ -85,13 +85,16 @@ module Minitest
           "#{dir}/#{hex[0..1]}/#{hex[2..]}"
         end
 
-        def fnv1a_64(data)
-          hash = 0xcbf29ce484222325
+        def fnv1a_64_iter(hash, data)
           data.bytes.each do |byte|
             hash ^= byte
             hash = (hash * 0x100000001b3) % (2**64)
           end
           hash
+        end
+
+        def fnv1a_64(data)
+          fnv1a_64_iter(0xcbf29ce484222325, data)
         end
 
         def set_file(path, contents, mtime = nil)

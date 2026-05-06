@@ -237,14 +237,15 @@ This may look worse at a glance, but underlies a large performance difference.
 useful. [This ruby patch](https://bugs.ruby-lang.org/issues/13378) optimizes them out when coupled
 with bootsnap.)*
 
-Bootsnap writes a cache file containing a 64 byte header followed by the cache contents. The header
+Bootsnap writes a cache file containing a 48 byte header followed by the cache contents. The header
 is a cache key including several fields:
 
-* `version`, hardcoded in bootsnap. Essentially a schema version;
-* `ruby_platform`, A hash of `RUBY_PLATFORM` (e.g. x86_64-linux-gnu) variable.
-* `compile_option`, which changes with `RubyVM::InstructionSequence.compile_option` does;
-* `ruby_revision`, A hash of `RUBY_REVISION`, the exact version of Ruby;
+* `ruby_version_digest`, a digest of:
+  * The `RUBY_DESCRIPTION` constant e.g. `"ruby 4.0.2 (2026-03-17 revision d3da9fec82) +PRISM [arm64-darwin25]"`.
+  * Bootsnap's cache version. Hardcoded in bootsnap. Essentially a schema version;
+  * The content of `RubyVM::InstructionSequence.compile_option`.
 * `size`, the size of the source file;
+* `digest`, a fnv1a_64 hash of the source file;
 * `mtime`, the last-modification timestamp of the source file when it was compiled; and
 * `data_size`, the number of bytes following the header, which we need to read it into a buffer.
 

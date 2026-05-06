@@ -40,7 +40,7 @@
 #define MAX_CACHEPATH_SIZE 1000
 #define MAX_CACHEDIR_SIZE  981
 
-#define KEY_SIZE 64
+#define KEY_SIZE 32
 
 #define MAX_CREATE_TEMPFILE_ATTEMPT 3
 
@@ -49,34 +49,27 @@
 #endif
 
 /*
- * An instance of this key is written as the first 64 bytes of each cache file.
+ * An instance of this key is written as the first `KEY_SIZE` bytes of each cache file.
  * The mtime and size members track whether the file contents have changed, and
- * the version, ruby_platform, compile_option, and ruby_revision members track
- * changes to the environment that could invalidate compile results without
+ * the ruby_version_digest (bootsnap_cache_version + RUBY_DESCRIPTION) and compile_option
+ * members track changes to the environment that could invalidate compile results without
  * file contents having changed. The data_size member is not truly part of the
  * "key". Really, this could be called a "header" with the first six members
  * being an embedded "key" struct and an additional data_size member.
  *
  * The data_size indicates the remaining number of bytes in the cache file
  * after the header (the size of the cached artifact).
- *
- * After data_size, the struct is padded to 64 bytes.
  */
 struct bs_cache_key {
-  uint32_t version;
-  uint32_t ruby_platform;
-  uint32_t compile_option;
-  uint32_t ruby_revision;
-  uint64_t size;
+  uint64_t ruby_version_digest;
   uint64_t mtime;
-  uint64_t data_size; //
   uint64_t digest;
-  uint8_t digest_set;
-  uint8_t pad[15];
+  uint32_t size;
+  uint32_t data_size;
 } __attribute__((packed));
 
 /*
- * If the struct padding isn't correct to pad the key to 64 bytes, refuse to
+ * If the struct padding isn't correct to pad the key to `KEY_SIZE` bytes, refuse to
  * compile.
  */
 #define STATIC_ASSERT(X)            STATIC_ASSERT2(X,__LINE__)
@@ -86,15 +79,15 @@ struct bs_cache_key {
 STATIC_ASSERT(sizeof(struct bs_cache_key) == KEY_SIZE);
 
 /* Effectively a schema version. Bumping invalidates all previous caches */
-static const uint32_t current_version = 6;
+static const uint32_t bootsnap_cache_version = 7;
 
-/* hash of e.g. "x86_64-darwin17", invalidating when ruby is recompiled on a
- * new OS ABI, etc. */
-static uint32_t current_ruby_platform;
-/* Invalidates cache when switching ruby versions */
-static uint32_t current_ruby_revision;
-/* Invalidates cache when RubyVM::InstructionSequence.compile_option changes */
-static uint32_t current_compile_option_crc32 = 0;
+/* Invalidates cache when switching ruby version, platform or ABI */
+static uint64_t base_ruby_version_digest = 0;
+
+// `base_ruby_version_digest` combined with RubyVM::InstructionSequence.compile_option
+// Invalidates cache when RubyVM::InstructionSequence.compile_option changes
+static uint64_t current_ruby_version_digest = 0;
+
 /* Current umask */
 static mode_t current_umask;
 
@@ -136,8 +129,7 @@ static VALUE bs_fetch(char * path, VALUE path_v, char * cache_path, VALUE handle
 static VALUE bs_precompile(char * path, VALUE path_v, char * cache_path, VALUE handler);
 static int open_current_file(const char * path, struct bs_cache_key * key, const char ** errno_provenance);
 static int fetch_cached_data(int fd, ssize_t data_size, VALUE handler, VALUE args, VALUE * output_data, int * exception_tag, const char ** errno_provenance);
-static uint32_t get_ruby_revision(void);
-static uint32_t get_ruby_platform(void);
+static uint64_t get_ruby_version_digest(void);
 
 /*
  * Helper functions to call ruby methods on handler object without crashing on
@@ -295,8 +287,7 @@ Init_bootsnap(void)
   rb_cBootsnap_CompileCache_UNCOMPILABLE = rb_const_get(rb_mBootsnap_CompileCache, rb_intern("UNCOMPILABLE"));
   rb_global_variable(&rb_cBootsnap_CompileCache_UNCOMPILABLE);
 
-  current_ruby_revision = get_ruby_revision();
-  current_ruby_platform = get_ruby_platform();
+  base_ruby_version_digest = get_ruby_version_digest();
 
   instrumentation_method = rb_intern("_instrument");
 
@@ -345,6 +336,33 @@ bs_revalidation_set(VALUE self, VALUE enabled)
   return enabled;
 }
 
+static uint64_t
+fnv1a_64_iter(uint64_t h, const unsigned char *s, size_t len)
+{
+  const unsigned char *str_end = s + len;
+
+  while (s < str_end) {
+    h ^= (uint64_t)*s++;
+    h += (h << 1) + (h << 4) + (h << 5) + (h << 7) + (h << 8) + (h << 40);
+  }
+
+  return h;
+}
+
+static uint64_t
+fnv1a_64_iter_str(uint64_t h, const VALUE str)
+{
+  Check_Type(str, T_STRING);
+  return fnv1a_64_iter(h, (unsigned char *)RSTRING_PTR(str), RSTRING_LEN(str));
+}
+
+static uint64_t
+fnv1a_64_str(const VALUE str)
+{
+  uint64_t h = (uint64_t)0xcbf29ce484222325ULL;
+  return fnv1a_64_iter_str(h, str);
+}
+
 /*
  * Bootsnap's ruby code registers a hook that notifies us via this function
  * when compile_option changes. These changes invalidate all existing caches.
@@ -358,64 +376,17 @@ bs_compile_option_crc32_set(VALUE self, VALUE crc32_v)
   if (!RB_TYPE_P(crc32_v, T_BIGNUM) && !RB_TYPE_P(crc32_v, T_FIXNUM)) {
     Check_Type(crc32_v, T_FIXNUM);
   }
-  current_compile_option_crc32 = NUM2UINT(crc32_v);
+  uint32_t crc32 = (uint32_t)NUM2UINT(crc32_v);
+  current_ruby_version_digest = fnv1a_64_iter(base_ruby_version_digest, (unsigned char *)&crc32, sizeof(crc32));
   return Qnil;
 }
 
 static uint64_t
-fnv1a_64_iter(uint64_t h, const VALUE str)
+get_ruby_version_digest(void)
 {
-  unsigned char *s = (unsigned char *)RSTRING_PTR(str);
-  unsigned char *str_end = (unsigned char *)RSTRING_PTR(str) + RSTRING_LEN(str);
-
-  while (s < str_end) {
-    h ^= (uint64_t)*s++;
-    h += (h << 1) + (h << 4) + (h << 5) + (h << 7) + (h << 8) + (h << 40);
-  }
-
-  return h;
-}
-
-static uint64_t
-fnv1a_64(const VALUE str)
-{
-  uint64_t h = (uint64_t)0xcbf29ce484222325ULL;
-  return fnv1a_64_iter(h, str);
-}
-
-/*
- * Ruby's revision may be Integer or String. CRuby 2.7 or later uses
- * Git commit ID as revision. It's String.
- */
-static uint32_t
-get_ruby_revision(void)
-{
-  VALUE ruby_revision;
-
-  ruby_revision = rb_const_get(rb_cObject, rb_intern("RUBY_REVISION"));
-  if (RB_TYPE_P(ruby_revision, RUBY_T_FIXNUM)) {
-    return FIX2INT(ruby_revision);
-  } else {
-    uint64_t hash;
-
-    hash = fnv1a_64(ruby_revision);
-    return (uint32_t)(hash >> 32);
-  }
-}
-
-/*
- * When ruby's version doesn't change, but it's recompiled on a different OS
- * (or OS version), we need to invalidate the cache.
- */
-static uint32_t
-get_ruby_platform(void)
-{
-  uint64_t hash;
-  VALUE ruby_platform;
-
-  ruby_platform = rb_const_get(rb_cObject, rb_intern("RUBY_PLATFORM"));
-  hash = fnv1a_64(ruby_platform);
-  return (uint32_t)(hash >> 32);
+  uint64_t hash = fnv1a_64_str(rb_const_get(rb_cObject, rb_intern("RUBY_DESCRIPTION")));
+  hash = fnv1a_64_iter(hash, (unsigned char *)&bootsnap_cache_version, sizeof(bootsnap_cache_version));
+  return hash;
 }
 
 /*
@@ -443,7 +414,7 @@ bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_p
   const char * cachedir = RSTRING_PTR(cachedir_v);
   const char * namespace = NIL_P(namespace_v) ? "" : RSTRING_PTR(namespace_v);
 
-  uint64_t hash = fnv1a_64(path_v);
+  uint64_t hash = fnv1a_64_str(path_v);
   uint8_t first_byte = (hash >> (64 - 8));
   uint64_t remainder = hash & 0x00ffffffffffffff;
 
@@ -460,10 +431,8 @@ bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_p
  */
 static enum cache_status cache_key_equal_fast_path(struct bs_cache_key *k1,
                                      struct bs_cache_key *k2) {
-  if (k1->version == k2->version &&
-          k1->ruby_platform == k2->ruby_platform &&
-          k1->compile_option == k2->compile_option &&
-          k1->ruby_revision == k2->ruby_revision && k1->size == k2->size) {
+  if (k1->ruby_version_digest == k2->ruby_version_digest &&
+          k1->size == k2->size) {
       if (k1->mtime == k2->mtime) {
         return hit;
       }
@@ -507,10 +476,9 @@ static int update_cache_key(struct bs_cache_key *current_key, struct bs_cache_ke
  */
 static void bs_cache_key_digest(struct bs_cache_key *key,
                                 const VALUE input_data) {
-  if (key->digest_set)
+  if (key->digest)
     return;
-  key->digest = fnv1a_64(input_data);
-  key->digest_set = 1;
+  key->digest = fnv1a_64_str(input_data);
 }
 
 /*
@@ -587,13 +555,19 @@ open_current_file(const char * path, struct bs_cache_key * key, const char ** er
     return -1;
   }
 
-  key->version        = current_version;
-  key->ruby_platform  = current_ruby_platform;
-  key->compile_option = current_compile_option_crc32;
-  key->ruby_revision  = current_ruby_revision;
-  key->size           = (uint64_t)statbuf.st_size;
-  key->mtime          = (uint64_t)statbuf.st_mtime;
-  key->digest_set     = false;
+  key->ruby_version_digest = current_ruby_version_digest;
+
+  // We're limited to file of 4GiB or less. Hopefully that's enough for everyone.
+  if (statbuf.st_size > (uint32_t)-1) {
+    *errno_provenance = "bs_fetch:open_current_file:file_too_big";
+    close(fd);
+    errno = EFBIG;
+    return -1;
+  }
+
+  key->size = (uint32_t)statbuf.st_size;
+  key->mtime = (uint64_t)statbuf.st_mtime;
+  key->digest = 0;
 
   return fd;
 }
@@ -663,10 +637,10 @@ open_cache_file(const char * path, struct bs_cache_key * key, const char ** errn
 
 /*
  * The cache file is laid out like:
- *   0...64 : bs_cache_key
- *   64..-1 : cached artifact
+ *   0...`KEY_SIZE` : bs_cache_key
+ *   `KEY_SIZE`..-1 : cached artifact
  *
- * This function takes a file descriptor whose position is pre-set to 64, and
+ * This function takes a file descriptor whose position is pre-set to `KEY_SIZE`, and
  * the data_size (corresponding to the remaining number of bytes) listed in the
  * cache header.
  *
@@ -782,7 +756,12 @@ atomic_write_cache_file(char * path, struct bs_cache_key * key, VALUE data, cons
   setmode(fd, O_BINARY);
   #endif
 
-  key->data_size = RSTRING_LEN(data);
+  uint64_t data_size = RSTRING_LEN(data);
+  if (data_size > (uint32_t)-1) {
+    return 0; // Don't cache.
+  }
+
+  key->data_size = (uint32_t)data_size;
   nwrite = write(fd, key, KEY_SIZE);
   if (nwrite < 0) {
     *errno_provenance = "bs_fetch:atomic_write_cache_file:write";

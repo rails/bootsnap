@@ -40,7 +40,7 @@
 #define MAX_CACHEPATH_SIZE 1000
 #define MAX_CACHEDIR_SIZE  981
 
-#define KEY_SIZE 40
+#define KEY_SIZE 32
 
 #define MAX_CREATE_TEMPFILE_ATTEMPT 3
 
@@ -62,10 +62,10 @@
  */
 struct bs_cache_key {
   uint64_t ruby_version_digest;
-  uint64_t size;
   uint64_t mtime;
-  uint64_t data_size;
   uint64_t digest;
+  uint32_t size;
+  uint32_t data_size;
 } __attribute__((packed));
 
 /*
@@ -556,9 +556,18 @@ open_current_file(const char * path, struct bs_cache_key * key, const char ** er
   }
 
   key->ruby_version_digest = current_ruby_version_digest;
-  key->size           = (uint64_t)statbuf.st_size;
-  key->mtime          = (uint64_t)statbuf.st_mtime;
-  key->digest         = 0;
+
+  // We're limited to file of 4GiB or less. Hopefully that's enough for everyone.
+  if (statbuf.st_size > (uint32_t)-1) {
+    *errno_provenance = "bs_fetch:open_current_file:file_too_big";
+    close(fd);
+    errno = EFBIG;
+    return -1;
+  }
+
+  key->size = (uint32_t)statbuf.st_size;
+  key->mtime = (uint64_t)statbuf.st_mtime;
+  key->digest = 0;
 
   return fd;
 }
@@ -747,7 +756,12 @@ atomic_write_cache_file(char * path, struct bs_cache_key * key, VALUE data, cons
   setmode(fd, O_BINARY);
   #endif
 
-  key->data_size = RSTRING_LEN(data);
+  uint64_t data_size = RSTRING_LEN(data);
+  if (data_size > (uint32_t)-1) {
+    return 0; // Don't cache.
+  }
+
+  key->data_size = (uint32_t)data_size;
   nwrite = write(fd, key, KEY_SIZE);
   if (nwrite < 0) {
     *errno_provenance = "bs_fetch:atomic_write_cache_file:write";

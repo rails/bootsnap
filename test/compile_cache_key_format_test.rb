@@ -12,12 +12,12 @@ class CompileCacheKeyFormatTest < Minitest::Test
 
   R = {
     ruby_version_digest: 0...8,
-    size: 8...16,
-    mtime: 16...24,
-    data_size: 24...32,
-    digest: 32...40,
+    mtime: 8...16,
+    digest: 16...24,
+    size: 24...28,
+    data_size: 28...32,
   }.freeze
-  CACHE_KEY_SIZE = 40
+  CACHE_KEY_SIZE = 32
 
   def teardown
     Bootsnap::CompileCache::Native.revalidation = false
@@ -48,7 +48,7 @@ class CompileCacheKeyFormatTest < Minitest::Test
   def test_key_size
     key = cache_key_for_file(FILE)
     exp = File.size(FILE)
-    act = key[R[:size]].unpack1("Q")
+    act = key[R[:size]].unpack1("L")
     assert_equal(exp, act)
   end
 

@@ -237,7 +237,7 @@ This may look worse at a glance, but underlies a large performance difference.
 useful. [This ruby patch](https://bugs.ruby-lang.org/issues/13378) optimizes them out when coupled
 with bootsnap.)*
 
-Bootsnap writes a cache file containing a 48 byte header followed by the cache contents. The header
+Bootsnap writes a cache file containing a 32 byte header followed by the cache contents. The header
 is a cache key including several fields:
 
 * `ruby_version_digest`, a digest of:

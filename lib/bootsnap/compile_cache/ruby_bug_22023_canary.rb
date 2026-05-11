@@ -1,10 +1,9 @@
 # rubocop:disable Style/FrozenStringLiteralComment
-def foo(bars)
-  case bars
+f = -> {
+  case foo
   in [one, "a" | "b" => two]
     puts "#{one} - #{two}"
   end
-end
-
+}
 _ = "test"
 # rubocop:enable Style/FrozenStringLiteralComment

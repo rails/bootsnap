@@ -16,7 +16,7 @@ module Bootsnap
 
         @pool.shutdown
         files = Dir.chdir(tmpdir) { Dir["*"] }.sort
-        assert_equal 10.times.map(&:to_s), files
+        assert_equal Array.new(10, &:to_s), files
       end
     end
   end

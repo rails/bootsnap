@@ -34,7 +34,7 @@ class CompileCacheTest < Minitest::Test
   end
 
   def test_no_write_permission_to_cache
-    if RbConfig::CONFIG["host_os"] =~ /mswin|mingw|cygwin/
+    if /mswin|mingw|cygwin/.match?(RbConfig::CONFIG["host_os"])
       # Always pass this test on Windows because directories aren't read, only
       # listed. You can restrict the ability to list directory contents on
       # Windows or you can set ACLS on a folder such that it is not allowed to
@@ -55,7 +55,7 @@ class CompileCacheTest < Minitest::Test
   end
 
   def test_no_read_permission
-    if RbConfig::CONFIG["host_os"] =~ /mswin|mingw|cygwin/
+    if /mswin|mingw|cygwin/.match?(RbConfig::CONFIG["host_os"])
       # On windows removing read permission doesn't prevent reading.
       pass
     else

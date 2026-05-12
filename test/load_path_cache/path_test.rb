@@ -22,7 +22,7 @@ module Bootsnap
         unknown         = Path.new("/who/knows")
         lib             = Path.new("#{RbConfig::CONFIG['rubylibdir']}/a")
         site            = Path.new("#{RbConfig::CONFIG['sitedir']}/b")
-        absolute_prefix = RbConfig::CONFIG["host_os"] =~ /mswin|mingw|cygwin/ ? ENV["SystemDrive"] : ""
+        absolute_prefix = /mswin|mingw|cygwin/.match?(RbConfig::CONFIG["host_os"]) ? ENV["SystemDrive"] : ""
         bundler         = Path.new("#{absolute_prefix}/bp/3")
 
         Bundler.stubs(:bundle_path).returns("#{absolute_prefix}/bp")
@@ -40,7 +40,7 @@ module Bootsnap
       end
 
       def test_non_directory?
-        if RbConfig::CONFIG["host_os"] =~ /mswin|mingw|cygwin/
+        if /mswin|mingw|cygwin/.match?(RbConfig::CONFIG["host_os"])
           refute(Path.new("c:/dev").non_directory?)
           refute(Path.new("c:/nope").non_directory?)
           # there isn't a direct analog i could think of

@@ -246,7 +246,7 @@ class CompileCacheYAMLTest < Minitest::Test
   end
 
   def test_no_read_permission
-    if RbConfig::CONFIG["host_os"] =~ /mswin|mingw|cygwin/
+    if /mswin|mingw|cygwin/.match?(RbConfig::CONFIG["host_os"])
       # On windows removing read permission doesn't prevent reading.
       pass
     else

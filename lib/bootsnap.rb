@@ -160,7 +160,7 @@ module Bootsnap
       end
     end
 
-    if RbConfig::CONFIG["host_os"] =~ /mswin|mingw|cygwin/
+    if /mswin|mingw|cygwin/.match?(RbConfig::CONFIG["host_os"])
       def absolute_path?(path)
         path[1] == ":"
       end

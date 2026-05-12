@@ -62,7 +62,7 @@ module Bootsnap
           # Ref: https://github.com/rails/bootsnap/issues/495
           # The second forked process will hang on some QEMU environments
           r, w = IO.pipe
-          pids = 2.times.map do
+          pids = Array.new(2) do
             ::Process.fork do
               exit!(true)
             end
@@ -161,7 +161,7 @@ module Bootsnap
       end
 
       def spawn
-        @workers = @size.times.map { Worker.new(@jobs) }
+        @workers = Array.new(@size) { Worker.new(@jobs) }
         @workers.each(&:spawn)
         @dispatcher_thread = Thread.new { dispatch_loop }
         @dispatcher_thread.abort_on_exception = true

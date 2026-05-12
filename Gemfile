@@ -17,4 +17,5 @@ gem "mocha", "> 3"
 
 group :development do
   gem "rubocop"
+  gem "rubocop-performance"
 end

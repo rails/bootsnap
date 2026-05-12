@@ -31,7 +31,7 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 2.7.0"
 
-  if RUBY_PLATFORM =~ /java/
+  if RUBY_PLATFORM.include?("java")
     spec.platform = "java"
   else
     spec.platform    = Gem::Platform::RUBY

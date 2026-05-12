@@ -40,14 +40,14 @@ module Bootsnap
           assert_equal false, cache.find("enumerator.rb")
         else
           assert_equal false, cache.find("enumerator.so")
-          if RUBY_PLATFORM =~ /darwin/
+          if RUBY_PLATFORM.include?("darwin")
             assert_equal false, cache.find("enumerator.bundle")
           else
             assert_same FALLBACK_SCAN, cache.find("enumerator.bundle")
           end
         end
 
-        bundle = RUBY_PLATFORM =~ /darwin/ ? "bundle" : "so"
+        bundle = RUBY_PLATFORM.include?("darwin") ? "bundle" : "so"
 
         # These are not present in TruffleRuby but that means they will still return falsey.
         refute(cache.find("thread.#{bundle}"))
@@ -142,7 +142,7 @@ module Bootsnap
         assert_equal("#{@dir1}/a.rb", cache.find("a"))
       end
 
-      if RbConfig::CONFIG["host_os"] !~ /mswin|mingw|cygwin/
+      unless /mswin|mingw|cygwin/.match?(RbConfig::CONFIG["host_os"])
         # https://github.com/ruby/ruby/pull/4061
         # https://bugs.ruby-lang.org/issues/17517
         OS_ASCII_PATH_ENCODING = RUBY_VERSION >= "3.1" ? Encoding::UTF_8 : Encoding::US_ASCII

@@ -84,7 +84,7 @@ module Bootsnap
         rescue Errno::ENOENT, MessagePack::MalformedFormatError, MessagePack::UnknownExtTypeError, EOFError
           default_data
         rescue ArgumentError => error
-          if error.message =~ /negative array size/
+          if error.message.include?("negative array size")
             default_data
           else
             raise

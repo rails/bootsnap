@@ -1,3 +1,6 @@
+plugins:
+  - rubocop-performance
+
 AllCops:
   Exclude:
     - 'vendor/**/*'

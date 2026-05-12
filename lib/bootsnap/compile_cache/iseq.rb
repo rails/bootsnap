@@ -27,7 +27,7 @@ module Bootsnap
           @compile_options = compile_options
         end
 
-        has_ruby_bug_18250 = begin # https://bugs.ruby-lang.org/issues/18250
+        has_ruby_bug_18250 = RUBY_VERSION.start_with?("3.0.") && begin # https://bugs.ruby-lang.org/issues/18250
           if defined? RubyVM::InstructionSequence
             RubyVM::InstructionSequence.compile("def foo(*); ->{ super }; end; def foo(**); ->{ super }; end").to_binary
           end

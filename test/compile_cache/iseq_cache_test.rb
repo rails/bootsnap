@@ -44,7 +44,7 @@ class CompileCacheISeqTest < Minitest::Test
   end
 
   def test_input_to_output_encoding
-    compiler = Bootsnap::CompileCache::ISeq::DEFAULT
+    compiler = Bootsnap::CompileCache::ISeq::FROZEN_STRING_LITERAL
     source = "_a = 'fée'.encoding".b
     iseq = compiler.input_to_output(source, "a.rb", nil)
     assert_equal Encoding.default_external, iseq.eval

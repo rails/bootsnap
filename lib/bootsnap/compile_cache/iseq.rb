@@ -94,13 +94,15 @@ module Bootsnap
         end
 
         def input_to_output(source, path, _kwargs)
-          RubyVM::InstructionSequence.compile(
-            source.force_encoding(Encoding.default_external),
-            path,
-            path,
-            nil,
-            @compile_options,
-          )
+          if @compile_options
+            RubyVM::InstructionSequence.compile(
+              source.force_encoding(Encoding.default_external),
+              path,
+              path,
+              nil,
+              @compile_options,
+            )
+          end
         end
       end
 

@@ -25,6 +25,9 @@ module Bootsnap
         false
       rescue TypeError
         true
+      rescue RuntimeError => error # Ref: https://github.com/rails/bootsnap/issues/547
+        raise unless error.message == "should not compile with coverage"
+        false
       end
 
       if has_ruby_bug_18250
@@ -46,6 +49,9 @@ module Bootsnap
           RubyVM::InstructionSequence.compile_file(path).to_binary
         rescue SyntaxError
           UNCOMPILABLE # syntax error
+        rescue RuntimeError => error # Ref: https://github.com/rails/bootsnap/issues/547
+          raise unless error.message == "should not compile with coverage"
+          UNCOMPILABLE
         end
       end
 

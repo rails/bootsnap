@@ -5,6 +5,7 @@ AllCops:
   Exclude:
     - 'vendor/**/*'
     - 'tmp/**/*'
+    - 'test/fixtures/app/**/*'
     - lib/bootsnap/compile_cache/ruby_bug_22023_canary.rb
 
   TargetRubyVersion: 2.7

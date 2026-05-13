@@ -24,7 +24,7 @@ class CompileCacheISeqTest < Minitest::Test
       if path.end_with?("a.rb")
         Bootsnap::CompileCache::ISeq::FROZEN_STRING_LITERAL
       else
-        Bootsnap::CompileCache::ISeq::MUTABLE_STRING_LITERAL
+        Bootsnap::CompileCache::ISeq::DEFAULT
       end
     }
 

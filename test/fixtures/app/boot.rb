@@ -21,7 +21,7 @@ require "bootsnap/setup"
 
 case ENV["COMPILER"]
 when "fstr"
-  Bootsnap.enable_frozen_string_literal(app_only: false)
+  Bootsnap.enable_frozen_string_literal(app_only: true)
 when nil
 else
   raise "Unkown $COMPILER value: #{ENV["COMPILER"].inspect}"

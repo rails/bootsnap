@@ -1,5 +1,13 @@
 # Unreleased
 
+# 1.24.4
+
+* Fix several compatibility issues with Ruby `4.0.4`, particularly the `should not compile with coverage` error. See #547.
+* Fix `Bootsnap.enable_frozen_string_literal` to work even when coverage is enabled. Unfortunately only possible on Ruby `4.0.4+`.
+  On older rubies if coverage is enabled a warning will be issued and the feature won't work.
+* Reduced cache files header size from 64 to 32 bytes, and got rid of the random padding element.
+* Avoid leaking a private method in `Object` when testing for Parse.y bugs.
+
 # 1.24.3
 
 * Fix the `1.24.2` workaround to parse Ruby files with UTF-8 even when the `LANG` environment variable

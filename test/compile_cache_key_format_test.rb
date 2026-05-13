@@ -35,6 +35,19 @@ class CompileCacheKeyFormatTest < Minitest::Test
     RubyVM::InstructionSequence.compile_option = {tailcall_optimization: false}
   end
 
+  def test_key_compile_option_custom_compiler
+    Bootsnap::CompileCache::ISeq.default_compiler = Bootsnap::CompileCache::ISeq::FROZEN_STRING_LITERAL
+    k1 = cache_key_for_file(FILE)
+    k2 = cache_key_for_file(FILE)
+    RubyVM::InstructionSequence.compile_option = {tailcall_optimization: true}
+    k3 = cache_key_for_file(FILE)
+    assert_equal(k1[R[:ruby_version_digest]], k2[R[:ruby_version_digest]])
+    refute_equal(k1[R[:ruby_version_digest]], k3[R[:ruby_version_digest]])
+  ensure
+    Bootsnap::CompileCache::ISeq.default_compiler = Bootsnap::CompileCache::ISeq::DEFAULT
+    RubyVM::InstructionSequence.compile_option = {tailcall_optimization: false}
+  end
+
   def test_key_ruby_version_digest
     Bootsnap::CompileCache::ISeq.compile_option_updated
 

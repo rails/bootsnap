@@ -102,8 +102,8 @@ module Bootsnap
           end
         }
       else
-        Bootsnap::CompileCache::ISeq.compiler_selector = nil
-        Bootsnap::CompileCache::ISeq.default_compiler = Bootsnap::CompileCache::ISeq::FROZEN_STRING_LITERAL
+        options = RubyVM::InstructionSequence.compile_option.merge(frozen_string_literal: true)
+        RubyVM::InstructionSequence.compile_option = options
       end
     end
 

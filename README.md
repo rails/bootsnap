@@ -350,6 +350,10 @@ Bootsnap::CompileCache::ISeq.compiler_selector = ->(path) do
 end
 ```
 
+*Important note*: This feature is only fully supported by Ruby `4.0.4` and newer.
+On older rubies the feature work except if the `Coverage` module is enabled, in which case a warning will be emitted
+and the default Ruby compiler will be used.
+
 ## Precompilation
 
 In development environments the bootsnap compilation cache is generated on the fly when source files are loaded.

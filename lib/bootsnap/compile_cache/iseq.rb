@@ -108,11 +108,30 @@ module Bootsnap
 
       DEFAULT = Compiler.new
       FROZEN_STRING_LITERAL = Compiler.new("-fstr", {frozen_string_literal: true}.freeze)
-      MUTABLE_STRING_LITERAL = Compiler.new("-no-fstr", {frozen_string_literal: false}.freeze)
+      COVERAGE_SUPPORTED = RUBY_VERSION >= "4.0.4"
       @default_compiler = DEFAULT
+      @coverage_support_warning_emitted = false
 
       def self.fetch(path, cache_dir: ISeq.cache_dir)
         compiler = compiler_selector&.call(path) || default_compiler
+
+        # Having coverage enabled prevents iseq dumping/loading.
+        if coverage_on?
+          return nil if compiler.equal?(DEFAULT)
+
+          if COVERAGE_SUPPORTED
+            return compiler.input_to_output(File.read(path.to_s), path.to_s, nil)
+          elsif !@coverage_support_warning_emitted
+            @coverage_support_warning_emitted = true
+            warn(<<~MSG)
+              Using `Bootsnap.enable_frozen_string_literal` with code coverage enabled is only supported on Ruby 4.0.4+.
+              Files loaded while coverage is on, will have mutable string literals.
+            MSG
+          end
+
+          return nil
+        end
+
         Bootsnap::CompileCache::Native.fetch(
           cache_dir,
           compiler.namespace,
@@ -132,11 +151,18 @@ module Bootsnap
         )
       end
 
+      if RUBY_VERSION < "3.1."
+        def self.coverage_on?
+          defined?(Coverage) && Coverage.running?
+        end
+      else
+        def self.coverage_on?
+          defined?(Coverage) && Coverage.state != :idle
+        end
+      end
+
       module InstructionSequenceMixin
         def load_iseq(path)
-          # Having coverage enabled prevents iseq dumping/loading.
-          return nil if coverage_on?
-
           Bootsnap::CompileCache::ISeq.fetch(path.to_s)
         rescue RuntimeError => error
           if error.message.include?("unmatched platform")
@@ -148,16 +174,6 @@ module Bootsnap
         def compile_option=(hash)
           super
           Bootsnap::CompileCache::ISeq.compile_option_updated
-        end
-
-        if RUBY_VERSION < "3.1."
-          def coverage_on?
-            defined?(Coverage) && Coverage.running?
-          end
-        else
-          def coverage_on?
-            defined?(Coverage) && Coverage.state != :idle
-          end
         end
       end
 

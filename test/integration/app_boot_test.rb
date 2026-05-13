@@ -28,22 +28,32 @@ module Bootsnap
       assert_boot("check_frozen_literal", compiler: "fstr")
     end
 
-    def test_boot_frozen_string_literal_and_coverage
+    def test_coverage_working
       skip("MRI only") unless RUBY_ENGINE == "ruby"
-      skip("Need to find a workaround for this...")
-      assert_boot("check_frozen_literal", compiler: "fstr", coverage: "started")
+      assert_boot("coverage_accurate")
+    end
+
+    def test_coverage_working_with_frozen_string_literal
+      skip("MRI only") unless RUBY_ENGINE == "ruby"
+      working = RUBY_VERSION >= "4.0.4"
+      assert_boot("coverage_accurate", compiler: "fstr", check_string_literals: working ? "frozen" : "mutable")
     end
 
     private
 
-    def assert_boot(feature, coverage: nil, compiler: nil)
+    def assert_boot(feature, coverage: nil, compiler: nil, check_string_literals: nil)
       env = {
         "BOOTSNAP_CACHE_DIR" => @tmp_dir,
         "FEATURE" => feature,
         "COVERAGE" => coverage,
         "COMPILER" => compiler,
+        "CHECK_STRING_LITERALS" => check_string_literals,
       }
-      stdin, stdout_and_stderr, wait_thread = Open3.popen2e(env, RbConfig.ruby, File.join(APP_DIR, "boot.rb"))
+      stdin, stdout_and_stderr, wait_thread = Open3.popen2e(
+        env,
+        RbConfig.ruby, File.join(APP_DIR, "boot.rb"),
+        chdir: APP_DIR
+      )
       stdin.close
       status = wait_thread.value
       assert_predicate status, :success?, stdout_and_stderr.read

@@ -1,5 +1,10 @@
 # Unreleased
 
+# 1.24.5
+
+* No longer load the config file by default when setup is done manually. This is so cli applications like homebrew
+  don't mistakenly load another app's boostnap config.
+
 # 1.24.4
 
 * Fix several compatibility issues with Ruby `4.0.4`, particularly the `should not compile with coverage` error. See #547.

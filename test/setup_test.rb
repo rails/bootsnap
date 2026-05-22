@@ -24,6 +24,7 @@ module Bootsnap
         ignore_directories: nil,
         readonly: false,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
 
       Bootsnap.default_setup
@@ -41,6 +42,7 @@ module Bootsnap
         ignore_directories: nil,
         readonly: false,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
 
       Bootsnap.default_setup
@@ -58,6 +60,7 @@ module Bootsnap
         ignore_directories: nil,
         readonly: false,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
 
       Bootsnap.default_setup
@@ -75,6 +78,7 @@ module Bootsnap
         ignore_directories: nil,
         readonly: false,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
 
       Bootsnap.default_setup
@@ -99,6 +103,7 @@ module Bootsnap
         ignore_directories: nil,
         readonly: false,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
       Bootsnap.expects(:logger=).with($stderr.method(:puts))
 
@@ -117,6 +122,7 @@ module Bootsnap
         ignore_directories: %w[foo bar],
         readonly: false,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
 
       Bootsnap.default_setup
@@ -134,6 +140,7 @@ module Bootsnap
         ignore_directories: nil,
         readonly: true,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
 
       Bootsnap.default_setup
@@ -149,6 +156,7 @@ module Bootsnap
         ignore_directories: nil,
         readonly: false,
         revalidation: false,
+        config_path: "config/bootsnap.rb",
       )
 
       Bootsnap.default_setup

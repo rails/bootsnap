@@ -43,13 +43,6 @@ module Bootsnap
       @instrumentation.call(event, path)
     end
 
-    def load_config
-      config_path = File.expand_path(ENV["BOOTSNAP_CONFIG"] || "config/bootsnap.rb")
-      if File.exist?(config_path)
-        require(config_path)
-      end
-    end
-
     def setup(
       cache_dir:,
       development_mode: true,
@@ -59,7 +52,8 @@ module Bootsnap
       revalidation: false,
       compile_cache_iseq: true,
       compile_cache_yaml: true,
-      compile_cache_json: (compile_cache_json_unset = true)
+      compile_cache_json: (compile_cache_json_unset = true),
+      config_path: nil
     )
       unless compile_cache_json_unset
         warn("Bootsnap.setup `compile_cache_json` argument is deprecated and has no effect")
@@ -84,7 +78,16 @@ module Bootsnap
         revalidation: revalidation,
       )
 
-      load_config
+      load_config(config_path)
+    end
+
+    def load_config(config_path)
+      if config_path
+        config_path = File.expand_path(config_path)
+        if File.exist?(config_path)
+          require(config_path)
+        end
+      end
     end
 
     def enable_frozen_string_literal(app_only: false)
@@ -150,6 +153,7 @@ module Bootsnap
           readonly: bool_env("BOOTSNAP_READONLY"),
           revalidation: bool_env("BOOTSNAP_REVALIDATE"),
           ignore_directories: ignore_directories,
+          config_path: ENV["BOOTSNAP_CONFIG"] || "config/bootsnap.rb",
         )
 
         if ENV["BOOTSNAP_LOG"]

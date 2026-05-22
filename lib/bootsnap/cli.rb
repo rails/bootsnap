@@ -43,7 +43,7 @@ module Bootsnap
           yaml: yaml,
           revalidation: true,
         )
-        Bootsnap.load_config
+        Bootsnap.load_config(ENV["BOOTSNAP_CONFIG"] || "config/bootsnap.rb")
 
         @work_pool = WorkerPool.create(size: jobs, jobs: {
           ruby: method(:precompile_ruby),

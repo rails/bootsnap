@@ -10,6 +10,9 @@ on:
   schedule:
     - cron:  '45 4 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   platforms:
     strategy:

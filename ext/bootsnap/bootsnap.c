@@ -403,11 +403,14 @@ bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_p
 
   Check_Type(cachedir_v, T_STRING);
   Check_Type(path_v, T_STRING);
+
+  long namespace_len = 0;
   if (!NIL_P(namespace_v)) {
     Check_Type(namespace_v, T_STRING);
+    namespace_len = RSTRING_LEN(namespace_v);
   }
 
-  if (RSTRING_LEN(cachedir_v) > MAX_CACHEDIR_SIZE) {
+  if (RSTRING_LEN(cachedir_v) + namespace_len > MAX_CACHEDIR_SIZE) {
     rb_raise(rb_eArgError, "cachedir too long");
   }
 

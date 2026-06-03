@@ -1,5 +1,9 @@
 # Unreleased
 
+# 1.24.6
+
+* Fix detection of Ruby bug #22023 on some patch versions of Ruby 3.4, and properly apply the workaround.
+
 # 1.24.5
 
 * No longer load the config file by default when setup is done manually. This is so cli applications like homebrew

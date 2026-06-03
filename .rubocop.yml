@@ -64,6 +64,9 @@ Naming/VariableNumber:
 Layout/MultilineMethodCallIndentation:
   EnforcedStyle: indented
 
+Layout/CaseIndentation:
+  EnforcedStyle: end
+
 Layout/EndAlignment:
   EnforcedStyleAlignWith: start_of_line
 
@@ -122,6 +125,9 @@ Security/YAMLLoad:
 
 # allow String.new to create mutable strings
 Style/EmptyLiteral:
+  Enabled: false
+
+Style/PerlBackrefs:
   Enabled: false
 
 Style/EmptyMethod:

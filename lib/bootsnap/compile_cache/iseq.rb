@@ -48,13 +48,15 @@ module Bootsnap
             true
           end
 
-          has_ruby_bug_22023 = if defined?(RubyVM::InstructionSequence) && RubyVM::InstructionSequence.respond_to?(:compile_file_prism)
-            begin
-              RubyVM::InstructionSequence.compile_file(File.expand_path("../ruby_bug_22023_canary.rb", __FILE__))
-              false
-            rescue SyntaxError
-              true
-            end
+          has_ruby_bug_22023 = case RUBY_VERSION
+          when /^3\.3\./
+            true
+          when /^3\.4\.(\d+)/
+            $1.to_i < 10
+          when /^4\.0\.(\d+)/
+            $1.to_i < 4
+          else
+            false
           end
 
           if has_ruby_bug_22023 && RUBY_DESCRIPTION.include?("+PRISM")

@@ -135,6 +135,14 @@ module Bootsnap
 
           NoTagsVisitor.new(scanner, loader).visit(ast)
         end
+
+        def msgpack_unpacker_options(kwargs)
+          return kwargs unless kwargs&.key?(:symbolize_names)
+
+          kwargs = kwargs.dup
+          kwargs[:symbolize_keys] = kwargs.delete(:symbolize_names)
+          kwargs
+        end
       end
 
       module Psych4
@@ -164,11 +172,9 @@ module Bootsnap
           end
 
           def storage_to_output(data, kwargs)
-            if kwargs&.key?(:symbolize_names)
-              kwargs[:symbolize_keys] = kwargs.delete(:symbolize_names)
-            end
-
-            unpacker = CompileCache::YAML.msgpack_factory.unpacker(kwargs)
+            unpacker = CompileCache::YAML.msgpack_factory.unpacker(
+              CompileCache::YAML.msgpack_unpacker_options(kwargs),
+            )
             unpacker.feed(data)
             _safe_loaded = unpacker.unpack
             result = unpacker.unpack
@@ -202,11 +208,9 @@ module Bootsnap
           end
 
           def storage_to_output(data, kwargs)
-            if kwargs&.key?(:symbolize_names)
-              kwargs[:symbolize_keys] = kwargs.delete(:symbolize_names)
-            end
-
-            unpacker = CompileCache::YAML.msgpack_factory.unpacker(kwargs)
+            unpacker = CompileCache::YAML.msgpack_factory.unpacker(
+              CompileCache::YAML.msgpack_unpacker_options(kwargs),
+            )
             unpacker.feed(data)
             safe_loaded = unpacker.unpack
             if safe_loaded
@@ -282,10 +286,9 @@ module Bootsnap
         end
 
         def storage_to_output(data, kwargs)
-          if kwargs&.key?(:symbolize_names)
-            kwargs[:symbolize_keys] = kwargs.delete(:symbolize_names)
-          end
-          unpacker = CompileCache::YAML.msgpack_factory.unpacker(kwargs)
+          unpacker = CompileCache::YAML.msgpack_factory.unpacker(
+            CompileCache::YAML.msgpack_unpacker_options(kwargs),
+          )
           unpacker.feed(data)
           _safe_loaded = unpacker.unpack
           unpacker.unpack

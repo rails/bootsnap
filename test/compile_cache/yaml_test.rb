@@ -152,6 +152,20 @@ class CompileCacheYAMLTest < Minitest::Test
       }
       assert_equal expected, document
     end
+
+    def test_load_file_symbolize_names_after_unsafe_cache
+      skip unless ::Bootsnap::CompileCache::YAML.supported_options.include?(:symbolize_names)
+
+      Help.set_file("a.yml", "---\nfoo: bar", 100)
+
+      kwargs = {symbolize_names: true}
+      FakeYaml.unsafe_load_file("a.yml", **kwargs)
+
+      2.times do
+        assert_equal({foo: "bar"}, FakeYaml.load_file("a.yml", **kwargs))
+        assert_equal({symbolize_names: true}, kwargs)
+      end
+    end
   else
     def test_yaml_input_to_output
       document = ::Bootsnap::CompileCache::YAML::Psych3.input_to_output(<<~YAML, "file.yml", {})

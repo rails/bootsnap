@@ -226,15 +226,11 @@ module Bootsnap
         end
 
         module Patch
-          def load_file(path, *args)
+          def load_file(path, *unknown_args, **kwargs)
             return super unless CompileCache::YAML.supported_internal_encoding?
 
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
+            return super if unknown_args.size > 1
+            return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
@@ -245,17 +241,11 @@ module Bootsnap
             )
           end
 
-          ruby2_keywords :load_file if respond_to?(:ruby2_keywords, true)
-
-          def unsafe_load_file(path, *args)
+          def unsafe_load_file(path, *unknown_args, **kwargs)
             return super unless CompileCache::YAML.supported_internal_encoding?
 
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
+            return super if unknown_args.size > 1
+            return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
@@ -265,8 +255,6 @@ module Bootsnap
               kwargs,
             )
           end
-
-          ruby2_keywords :unsafe_load_file if respond_to?(:ruby2_keywords, true)
         end
       end
 
@@ -299,15 +287,11 @@ module Bootsnap
         end
 
         module Patch
-          def load_file(path, *args)
+          def load_file(path, *unknown_args, **kwargs)
             return super unless CompileCache::YAML.supported_internal_encoding?
 
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
+            return super if unknown_args.size > 1
+            return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
@@ -318,17 +302,11 @@ module Bootsnap
             )
           end
 
-          ruby2_keywords :load_file if respond_to?(:ruby2_keywords, true)
-
-          def unsafe_load_file(path, *args)
+          def unsafe_load_file(path, *unknown_args, **kwargs)
             return super unless CompileCache::YAML.supported_internal_encoding?
 
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
+            return super if unknown_args.size > 1
+            return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
 
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
@@ -338,8 +316,6 @@ module Bootsnap
               kwargs,
             )
           end
-
-          ruby2_keywords :unsafe_load_file if respond_to?(:ruby2_keywords, true)
         end
       end
     end

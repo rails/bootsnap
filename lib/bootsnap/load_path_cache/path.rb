@@ -128,15 +128,20 @@ module Bootsnap
       RUBY_SITEDIR = RbConfig::CONFIG["sitedir"]
 
       def stability
-        @stability ||= if Gem.path.detect { |p| expanded_path.start_with?(p.to_s) }
+        @stability ||= if Gem.path.any? { |path| within?(path) }
           STABLE
-        elsif Bootsnap.bundler? && expanded_path.start_with?(Bundler.bundle_path.to_s)
+        elsif Bootsnap.bundler? && within?(Bundler.bundle_path)
           STABLE
-        elsif expanded_path.start_with?(RUBY_LIBDIR) && !expanded_path.start_with?(RUBY_SITEDIR)
+        elsif within?(RUBY_LIBDIR) && !within?(RUBY_SITEDIR)
           STABLE
         else
           VOLATILE
         end
+      end
+
+      def within?(root)
+        root = File.expand_path(root.to_s)
+        expanded_path == root || expanded_path.start_with?(root.end_with?(SLASH) ? root : "#{root}#{SLASH}")
       end
     end
   end

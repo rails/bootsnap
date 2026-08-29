@@ -776,7 +776,7 @@ atomic_write_cache_file(char * path, struct bs_cache_key * key, VALUE data, cons
 {
   char template[MAX_CACHEPATH_SIZE + 20];
   char * tmp_path;
-  int fd, ret, attempt;
+  int fd, ret, attempt, saved_errno;
   ssize_t nwrite;
 
   uint64_t data_size = RSTRING_LEN(data);
@@ -803,42 +803,51 @@ atomic_write_cache_file(char * path, struct bs_cache_key * key, VALUE data, cons
   }
 
   if (bs_fchmod(fd, tmp_path, 0644 & ~current_umask) < 0) {
-    close(fd);
     *errno_provenance = "bs_fetch:atomic_write_cache_file:chmod";
-    return -1;
+    goto write_error;
   }
 
   key->data_size = (uint32_t)data_size;
   nwrite = resumable_write(fd, key, KEY_SIZE);
   if (nwrite < 0) {
-    close(fd);
     *errno_provenance = "bs_fetch:atomic_write_cache_file:write";
-    return -1;
+    goto write_error;
   }
   if (nwrite != KEY_SIZE) {
-    close(fd);
     *errno_provenance = "bs_fetch:atomic_write_cache_file:keysize";
     errno = EIO; /* Lies but whatever */
-    return -1;
+    goto write_error;
   }
 
   nwrite = resumable_write(fd, RSTRING_PTR(data), RSTRING_LEN(data));
-  if (nwrite < 0) return -1;
+  if (nwrite < 0) {
+    *errno_provenance = "bs_fetch:atomic_write_cache_file:write";
+    goto write_error;
+  }
   if (nwrite != RSTRING_LEN(data)) {
-    close(fd);
     *errno_provenance = "bs_fetch:atomic_write_cache_file:writelength";
     errno = EIO; /* Lies but whatever */
-    return -1;
+    goto write_error;
   }
 
   close(fd);
 
   ret = rename(tmp_path, path);
   if (ret < 0) {
+    saved_errno = errno;
+    unlink(tmp_path);
+    errno = saved_errno;
     *errno_provenance = "bs_fetch:atomic_write_cache_file:rename";
     return -1;
   }
   return ret;
+
+write_error:
+  saved_errno = errno;
+  close(fd);
+  unlink(tmp_path);
+  errno = saved_errno;
+  return -1;
 }
 
 

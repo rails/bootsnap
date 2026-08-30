@@ -789,7 +789,7 @@ atomic_write_cache_file(char * path, struct bs_cache_key * key, VALUE data, cons
 
     // mkstemp modifies the template to be the actual created path
     fd = mkstemp(tmp_path);
-    if (fd > 0) break;
+    if (fd >= 0) break;
 
     if (attempt == 0 && mkpath(tmp_path, 0775) < 0) {
       *errno_provenance = "bs_fetch:atomic_write_cache_file:mkpath";

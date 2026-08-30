@@ -305,7 +305,6 @@ Init_bootsnap(void)
 
   current_umask = umask(0777);
   umask(current_umask);
-  fprintf(stderr, "current_umask = %u\n", current_umask);
 }
 
 static VALUE

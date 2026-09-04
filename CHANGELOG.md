@@ -1,6 +1,11 @@
 # Unreleased
 
+# 1.26.0
+
 * Handle top level `Coverage` constant being defined, but without it being the true stdlib `coverage` module.
+* Fix `bootsnap precompile` that could generate a corrupted cache entry if an already cached YAML file was modified
+  without changing its size.
+* Workaround a potential Ruby SEGV if `Bootsnap.instrumentation` raised an error.
 
 # 1.25.0
 

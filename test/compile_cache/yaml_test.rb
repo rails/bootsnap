@@ -292,6 +292,23 @@ class CompileCacheYAMLTest < Minitest::Test
     end
   end
 
+  def test_precompile_after_content_change_of_same_size
+    Bootsnap::CompileCache::Native.revalidation = true
+
+    Help.set_file("a.yml", "foo: aaa\n", 100)
+    assert Bootsnap::CompileCache::YAML.precompile(File.realpath("a.yml"))
+
+    # Same byte size, different content, newer mtime: takes the `stale` branch,
+    # where the digest check reads the file before the regenerate path re-reads it.
+    Help.set_file("a.yml", "foo: bbb\n", 200)
+    assert Bootsnap::CompileCache::YAML.precompile(File.realpath("a.yml"))
+
+    Bootsnap::CompileCache::Native.revalidation = false
+    assert_equal({"foo" => "bbb"}, FakeYaml.load_file("a.yml"))
+  ensure
+    Bootsnap::CompileCache::Native.revalidation = false
+  end
+
   private
 
   def with_default_encoding_internal(encoding)

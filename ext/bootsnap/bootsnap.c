@@ -1142,7 +1142,7 @@ bs_precompile(char * path, VALUE path_v, char * cache_path, VALUE handler)
   /* Cache is stale, invalid, or missing. Regenerate and write it out. */
 
   /* Read the contents of the source file into a buffer */
-  if ((input_data = bs_read_contents(current_fd, current_key.size, &errno_provenance)) == Qfalse) goto fail;
+  if (input_data == Qfalse && (input_data = bs_read_contents(current_fd, current_key.size, &errno_provenance)) == Qfalse) goto fail;
 
   /* Try to compile the input_data using input_to_storage(input_data) */
   exception_tag = bs_input_to_storage(handler, Qnil, input_data, path_v, &storage_data);

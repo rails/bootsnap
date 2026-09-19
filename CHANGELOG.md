@@ -1,5 +1,7 @@
 # Unreleased
 
+* Better detect support for fast path scanning. Fix compilation on Illumos.
+
 # 1.26.0
 
 * Handle top level `Coverage` constant being defined, but without it being the true stdlib `coverage` module.

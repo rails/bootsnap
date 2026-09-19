@@ -149,7 +149,7 @@ bs_rb_get_path(VALUE self, VALUE fname)
     return rb_get_path(fname);
 }
 
-#ifdef HAVE_FSTATAT
+#if defined(HAVE_FSTATAT) && defined(HAVE_STRUCT_DIRENT_D_TYPE)
 
 RBIMPL_ATTR_NORETURN()
 static void
@@ -275,7 +275,7 @@ Init_bootsnap(void)
 
   rb_define_singleton_method(rb_mBootsnap, "rb_get_path", bs_rb_get_path, 1);
 
-#ifdef HAVE_FSTATAT
+#if defined(HAVE_FSTATAT) && defined(HAVE_STRUCT_DIRENT_D_TYPE)
   VALUE rb_mBootsnap_LoadPathCache = rb_define_module_under(rb_mBootsnap, "LoadPathCache");
   VALUE rb_mBootsnap_LoadPathCache_Native = rb_define_module_under(rb_mBootsnap_LoadPathCache, "Native");
 

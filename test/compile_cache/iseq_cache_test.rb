@@ -54,7 +54,7 @@ class CompileCacheISeqTest < Minitest::Test
     previous_external = Encoding.default_external
     previous_internal = Encoding.default_internal
     fixtures = {
-      "utf8" => ["# frozen_string_literal: true\n'fée'\n", Encoding::UTF_8],
+      "utf8" => ["# encoding: UTF-8\n# frozen_string_literal: true\n'fée'\n", Encoding::UTF_8],
       "latin1" => ["# encoding: ISO-8859-1\n# frozen_string_literal: true\n'caf\xE9'\n".b, Encoding::ISO_8859_1],
     }
 

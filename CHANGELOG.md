@@ -1,5 +1,7 @@
 # Unreleased
 
+* Avoid transcoding Ruby source when the Prism workaround runs with a default internal encoding.
+
 * Better detect support for fast path scanning. Fix compilation on Illumos.
 
 # 1.26.0

@@ -72,7 +72,7 @@ module Bootsnap
 
       def load_data
         @data = begin
-          data = File.open(@store_path, encoding: Encoding::BINARY) do |io|
+          data = File.open(@store_path, binmode: true, encoding: Encoding::BINARY) do |io|
             MessagePack.load(io, freeze: true)
           end
           if data.is_a?(Hash) && data[VERSION_KEY] == CURRENT_VERSION
@@ -100,7 +100,7 @@ module Bootsnap
         exclusive_write = File::Constants::CREAT | File::Constants::EXCL | File::Constants::WRONLY
         # `encoding:` looks redundant wrt `binwrite`, but necessary on windows
         # because binary is part of mode.
-        File.open(tmp, mode: exclusive_write, encoding: Encoding::BINARY) do |io|
+        File.open(tmp, mode: exclusive_write, binmode: true, encoding: Encoding::BINARY) do |io|
           MessagePack.dump(@data, io)
         end
         File.rename(tmp, @store_path)

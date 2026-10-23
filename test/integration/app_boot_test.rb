@@ -29,6 +29,7 @@ module Bootsnap
     end
 
     def test_boot_frozen_string_literal_without_compile_cache
+      skip("MRI only") unless RUBY_ENGINE == "ruby"
       assert_boot("check_frozen_literal", compiler: "fstr", compile_cache: false)
     end
 

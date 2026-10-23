@@ -152,6 +152,8 @@ module Bootsnap
             return nil
           end
 
+          return compiler.input_to_output(nil, path.to_s, nil) unless cache_dir
+
           Bootsnap::CompileCache::Native.fetch(
             cache_dir,
             compiler.namespace,
@@ -206,7 +208,7 @@ module Bootsnap
         compile_option_updated if supported?
 
         def self.install!(cache_dir)
-          Bootsnap::CompileCache::ISeq.cache_dir = cache_dir
+          Bootsnap::CompileCache::ISeq.cache_dir = cache_dir if cache_dir
 
           return unless supported?
 

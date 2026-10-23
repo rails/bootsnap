@@ -29,7 +29,7 @@ module Bootsnap
     end
 
     def test_boot_frozen_string_literal_without_compile_cache
-      assert_boot("success", compiler: "fstr", compile_cache: false)
+      assert_boot("check_frozen_literal", compiler: "fstr", compile_cache: false)
     end
 
     def test_coverage_working

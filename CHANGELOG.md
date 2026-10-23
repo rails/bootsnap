@@ -1,7 +1,7 @@
 # Unreleased
 
 * Fix `Bootsnap.enable_frozen_string_literal(app_only: true)` raising `NameError` when the compile cache is disabled.
-  It now warns and leaves string literals mutable.
+  App files are now compiled with frozen string literals on every load, without caching.
 
 * Avoid transcoding Ruby source when the Prism workaround runs with a default internal encoding.
 

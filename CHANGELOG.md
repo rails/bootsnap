@@ -1,5 +1,7 @@
 # Unreleased
 
+* Fix `Bootsnap.enable_frozen_string_literal(app_only: true)` raising `NameError` when the compile cache is disabled.
+  It now warns and leaves string literals mutable.
 * Avoid transcoding Ruby source when the Prism workaround runs with a default internal encoding.
 
 * Better detect support for fast path scanning. Fix compilation on Illumos.

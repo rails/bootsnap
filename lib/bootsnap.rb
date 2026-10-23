@@ -95,6 +95,14 @@ module Bootsnap
 
     def enable_frozen_string_literal(app_only: false)
       if app_only
+        unless defined?(Bootsnap::CompileCache::ISeq)
+          warn(<<~MSG)
+            `Bootsnap.enable_frozen_string_literal(app_only: true)` requires the bytecode compile cache, which is disabled.
+            String literals will stay mutable.
+          MSG
+          return
+        end
+
         gems_root = File.join(Bundler.bundle_path.cleanpath, "")
         app_root =  File.join(Dir.pwd, "")
         Bootsnap::CompileCache::ISeq.default_compiler = Bootsnap::CompileCache::ISeq::DEFAULT

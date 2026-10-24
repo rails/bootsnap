@@ -20,7 +20,8 @@ jobs:
       matrix:
         os: [ubuntu, macos, windows]
         ruby: ['2.7']
-    runs-on: ${{ matrix.os }}-latest
+    # ruby/setup-ruby has no Ruby < 3.2 for ubuntu-26.04, which ubuntu-latest now points to
+    runs-on: ${{ matrix.os == 'ubuntu' && 'ubuntu-24.04' || format('{0}-latest', matrix.os) }}
     steps:
       - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
@@ -49,7 +50,8 @@ jobs:
       matrix:
         os: [ubuntu]
         ruby: ['3.0', '3.1', '3.2', '3.3', '3.4', '4.0', 'ruby-head', 'debug', 'truffleruby', 'truffleruby-head']
-    runs-on: ${{ matrix.os }}-latest
+    # ruby/setup-ruby has no Ruby < 3.2 for ubuntu-26.04, which ubuntu-latest now points to
+    runs-on: ${{ contains(fromJSON('["3.0", "3.1"]'), matrix.ruby) && 'ubuntu-24.04' || format('{0}-latest', matrix.os) }}
     steps:
       - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1

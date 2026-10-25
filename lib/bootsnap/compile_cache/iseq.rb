@@ -11,7 +11,7 @@ module Bootsnap
         attr_accessor :compiler_selector, :default_compiler
 
         def cache_dir=(cache_dir)
-          @cache_dir = cache_dir.end_with?("/") ? "#{cache_dir}iseq" : "#{cache_dir}-iseq"
+          @cache_dir = cache_dir && (cache_dir.end_with?("/") ? "#{cache_dir}iseq" : "#{cache_dir}-iseq")
         end
 
         def supported?
@@ -152,13 +152,17 @@ module Bootsnap
             return nil
           end
 
-          Bootsnap::CompileCache::Native.fetch(
-            cache_dir,
-            compiler.namespace,
-            path.to_s,
-            compiler,
-            nil,
-          )
+          if cache_dir
+            Bootsnap::CompileCache::Native.fetch(
+              cache_dir,
+              compiler.namespace,
+              path.to_s,
+              compiler,
+              nil,
+            )
+          else
+            compiler.input_to_output(nil, path.to_s, nil)
+          end
         end
 
         def self.precompile(path)

@@ -16,7 +16,6 @@ module Bootsnap
 
       if iseq
         if supported?
-          require_relative "compile_cache/iseq"
           Bootsnap::CompileCache::ISeq.install!(cache_dir)
         elsif $VERBOSE
           warn("[bootsnap/setup] bytecode caching is not supported on this implementation of Ruby")
@@ -44,4 +43,9 @@ module Bootsnap
         RUBY_PLATFORM.match?(/darwin|linux|bsd|mswin|mingw|cygwin/)
     end
   end
+end
+
+if RUBY_ENGINE != "jruby"
+  require_relative "compile_cache/iseq"
+  Bootsnap::CompileCache::ISeq.install!(nil)
 end

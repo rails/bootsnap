@@ -28,6 +28,11 @@ module Bootsnap
       assert_boot("check_frozen_literal", compiler: "fstr")
     end
 
+    def test_boot_frozen_string_literal_without_compile_cache
+      skip("MRI only") unless RUBY_ENGINE == "ruby"
+      assert_boot("check_frozen_literal", compiler: "fstr", compile_cache: false)
+    end
+
     def test_coverage_working
       skip("MRI only") unless RUBY_ENGINE == "ruby"
       assert_boot("coverage_accurate")
@@ -41,13 +46,14 @@ module Bootsnap
 
     private
 
-    def assert_boot(feature, coverage: nil, compiler: nil, check_string_literals: nil)
+    def assert_boot(feature, coverage: nil, compiler: nil, check_string_literals: nil, compile_cache: true)
       env = {
         "BOOTSNAP_CACHE_DIR" => @tmp_dir,
         "FEATURE" => feature,
         "COVERAGE" => coverage,
         "COMPILER" => compiler,
         "CHECK_STRING_LITERALS" => check_string_literals,
+        "DISABLE_BOOTSNAP_COMPILE_CACHE" => ("1" unless compile_cache),
       }
       stdin, stdout_and_stderr, wait_thread = Open3.popen2e(
         env,

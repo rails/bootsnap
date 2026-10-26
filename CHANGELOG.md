@@ -1,5 +1,7 @@
 # Unreleased
 
+# 1.26.1
+
 * Fix `Bootsnap.enable_frozen_string_literal(app_only: true)` raising `NameError` when the compile cache is disabled.
   App files are now compiled with frozen string literals on every load, without caching.
 

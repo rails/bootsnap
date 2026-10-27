@@ -74,9 +74,15 @@ module Minitest
     end
 
     module Help
+      NATIVE_REALPATH = !RbConfig::CONFIG["host_os"].match?(/mswin|mingw/)
+
       class << self
         def cache_path(dir, file, args_key = nil)
           hash = fnv1a_64(file)
+          if NATIVE_REALPATH
+            real_path = File.realpath(file)
+            hash = fnv1a_64_iter(hash, "\0#{real_path}") unless real_path == file
+          end
           unless args_key.nil?
             hash ^= fnv1a_64(args_key)
           end

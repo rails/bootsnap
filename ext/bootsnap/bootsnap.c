@@ -426,6 +426,20 @@ bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_p
   const char * namespace = NIL_P(namespace_v) ? "" : RSTRING_PTR(namespace_v);
 
   uint64_t hash = fnv1a_64_str(path_v);
+
+#ifdef HAVE_REALPATH
+  /* ISeqs record their source's real path. If a symlink in `path` is repointed to an
+   * identical copy, size and mtime still match, so key on the real path when it differs. */
+  char * real_path = realpath(RSTRING_PTR(path_v), NULL);
+  if (real_path) {
+    if (strcmp(real_path, RSTRING_PTR(path_v)) != 0) {
+      hash = fnv1a_64_iter(hash, (const unsigned char *)"", 1);
+      hash = fnv1a_64_iter(hash, (const unsigned char *)real_path, strlen(real_path));
+    }
+    free(real_path);
+  }
+#endif
+
   uint8_t first_byte = (hash >> (64 - 8));
   uint64_t remainder = hash & 0x00ffffffffffffff;
 

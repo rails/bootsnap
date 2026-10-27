@@ -217,6 +217,26 @@ class CompileCacheTest < Minitest::Test
     assert(File.size(cp) > 32) # cache was overwritten
   end
 
+  def test_symlink_repointed_to_identical_copy
+    skip("No realpath(3) on Windows") unless Help::NATIVE_REALPATH
+
+    Help.set_file("v1/a.rb", "$test_dir = __dir__", 100)
+    FileUtils.cp_r("v1", "v2", preserve: true)
+    File.symlink(File.join(@tmp_dir, "v1"), "current")
+    path = File.join(@tmp_dir, "current/a.rb")
+
+    load(path)
+    assert_equal(File.realpath("v1"), $test_dir)
+
+    File.unlink("current")
+    File.symlink(File.join(@tmp_dir, "v2"), "current")
+
+    load(path)
+    assert_equal(File.realpath("v2"), $test_dir)
+  ensure
+    $test_dir = nil
+  end
+
   def test_instrumentation_hit
     file_path = Help.set_file("a.rb", "a = a = 3", 100)
     load(file_path)

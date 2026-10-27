@@ -1,5 +1,9 @@
 # Unreleased
 
+* Fix the compile cache returning an ISeq with a stale real path when a symlink in the loaded path is repointed
+  to a copy of the file with the same size and mtime. This caused `require_relative` and `__dir__` to resolve against
+  the old target, and files to be loaded twice.
+
 # 1.26.1
 
 * Fix `Bootsnap.enable_frozen_string_literal(app_only: true)` raising `NameError` when the compile cache is disabled.

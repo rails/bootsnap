@@ -17,6 +17,10 @@ module Bootsnap
         def supported?
           CompileCache.supported? && defined?(RubyVM)
         end
+
+        def coverage_supported?(ruby_version = RUBY_VERSION)
+          Gem::Version.new(ruby_version) >= Gem::Version.new("4.0.4")
+        end
       end
 
       if supported?
@@ -127,7 +131,6 @@ module Bootsnap
 
         DEFAULT = Compiler.new
         FROZEN_STRING_LITERAL = Compiler.new("-fstr", {frozen_string_literal: true}.freeze)
-        COVERAGE_SUPPORTED = RUBY_VERSION >= "4.0.4"
 
         @default_compiler = DEFAULT
         @coverage_support_warning_emitted = false
@@ -139,7 +142,7 @@ module Bootsnap
           if coverage_on?
             return nil if compiler.equal?(DEFAULT)
 
-            if COVERAGE_SUPPORTED
+            if coverage_supported?
               return compiler.input_to_output(nil, path.to_s, nil)
             elsif !@coverage_support_warning_emitted
               @coverage_support_warning_emitted = true

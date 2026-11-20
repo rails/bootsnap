@@ -77,4 +77,12 @@ class CompileCacheISeqTest < Minitest::Test
     Encoding.default_external = previous_external
     Encoding.default_internal = previous_internal
   end
+
+  def test_coverage_supported_compares_versions_numerically
+    refute Bootsnap::CompileCache::ISeq.coverage_supported?("3.4.0")
+    refute Bootsnap::CompileCache::ISeq.coverage_supported?("4.0.3")
+    assert Bootsnap::CompileCache::ISeq.coverage_supported?("4.0.4")
+    assert Bootsnap::CompileCache::ISeq.coverage_supported?("4.0.10")
+    assert Bootsnap::CompileCache::ISeq.coverage_supported?("4.1.0")
+  end
 end

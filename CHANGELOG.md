@@ -1,5 +1,7 @@
 # Unreleased
 
+* Fix the `Bootsnap.enable_frozen_string_literal` with coverage warning being wrongly emitted on Ruby `4.0.10+`.
+
 # 1.26.1
 
 * Fix `Bootsnap.enable_frozen_string_literal(app_only: true)` raising `NameError` when the compile cache is disabled.

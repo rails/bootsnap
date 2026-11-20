@@ -40,7 +40,7 @@ module Bootsnap
 
     def test_coverage_working_with_frozen_string_literal
       skip("MRI only") unless RUBY_ENGINE == "ruby"
-      working = RUBY_VERSION >= "4.0.4"
+      working = CompileCache::ISeq.coverage_supported?
       assert_boot("coverage_accurate", compiler: "fstr", check_string_literals: working ? "frozen" : "mutable")
     end
 

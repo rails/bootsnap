@@ -1,5 +1,7 @@
 # Unreleased
 
+* Preserve the filename in `Psych::SyntaxError` raised when loading or compiling invalid YAML files through the YAML compile cache.
+
 # 1.26.2
 
 * Fix the `Bootsnap.enable_frozen_string_literal` with coverage warning being wrongly emitted on Ruby `4.0.10+`.

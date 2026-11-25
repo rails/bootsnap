@@ -168,8 +168,8 @@ module Bootsnap
           @implementation::Patch
         end
 
-        def strict_load(payload)
-          ast = ::YAML.parse(payload)
+        def strict_load(payload, filename: nil)
+          ast = ::YAML.parse(payload, filename: filename)
           return ast unless ast
 
           loader = ::Psych::ClassLoader::Restricted.new(["Symbol"], [])
@@ -190,10 +190,10 @@ module Bootsnap
       module Psych4
         extend self
 
-        def input_to_storage(contents, _)
-          obj = SafeLoad.input_to_storage(contents, nil)
+        def input_to_storage(contents, path)
+          obj = SafeLoad.input_to_storage(contents, path)
           if UNCOMPILABLE.equal?(obj)
-            obj = UnsafeLoad.input_to_storage(contents, nil)
+            obj = UnsafeLoad.input_to_storage(contents, path)
           end
           obj
         end
@@ -201,8 +201,8 @@ module Bootsnap
         module UnsafeLoad
           extend self
 
-          def input_to_storage(contents, _)
-            obj = ::YAML.unsafe_load(contents)
+          def input_to_storage(contents, path)
+            obj = ::YAML.unsafe_load(contents, filename: path)
             packer = CompileCache::YAML.msgpack_factory.packer
             packer.pack(false) # not safe loaded
             begin
@@ -224,17 +224,17 @@ module Bootsnap
             result
           end
 
-          def input_to_output(data, _path, kwargs)
-            ::YAML.unsafe_load(data, **(kwargs || {}))
+          def input_to_output(data, path, kwargs)
+            ::YAML.unsafe_load(data, filename: path, **(kwargs || {}))
           end
         end
 
         module SafeLoad
           extend self
 
-          def input_to_storage(contents, _)
+          def input_to_storage(contents, path)
             obj = begin
-              CompileCache::YAML.strict_load(contents)
+              CompileCache::YAML.strict_load(contents, filename: path)
             rescue Psych::DisallowedClass, Psych::BadAlias, Uncompilable
               return UNCOMPILABLE
             end
@@ -262,8 +262,8 @@ module Bootsnap
             end
           end
 
-          def input_to_output(data, _path, kwargs)
-            ::YAML.load(data, **(kwargs || {}))
+          def input_to_output(data, path, kwargs)
+            ::YAML.load(data, filename: path, **(kwargs || {}))
           end
         end
 
@@ -315,8 +315,8 @@ module Bootsnap
       module Psych3
         extend self
 
-        def input_to_storage(contents, _)
-          obj = ::YAML.load(contents)
+        def input_to_storage(contents, path)
+          obj = ::YAML.load(contents, filename: path)
           packer = CompileCache::YAML.msgpack_factory.packer
           packer.pack(false) # not safe loaded
           begin
@@ -336,8 +336,8 @@ module Bootsnap
           unpacker.unpack
         end
 
-        def input_to_output(data, _path, kwargs)
-          ::YAML.load(data, **(kwargs || {}))
+        def input_to_output(data, path, kwargs)
+          ::YAML.load(data, filename: path, **(kwargs || {}))
         end
 
         module Patch

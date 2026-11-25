@@ -153,6 +153,22 @@ class CompileCacheYAMLTest < Minitest::Test
       assert_equal expected, document
     end
 
+    def test_yaml_input_to_output_safe_syntax_error_includes_filename
+      error = assert_raises Psych::SyntaxError do
+        ::Bootsnap::CompileCache::YAML::Psych4::SafeLoad.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
+      end
+      assert_equal "bad.yml", error.file
+      assert_includes error.message, "bad.yml"
+    end
+
+    def test_yaml_input_to_output_unsafe_syntax_error_includes_filename
+      error = assert_raises Psych::SyntaxError do
+        ::Bootsnap::CompileCache::YAML::Psych4::UnsafeLoad.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
+      end
+      assert_equal "bad.yml", error.file
+      assert_includes error.message, "bad.yml"
+    end
+
     def test_load_file_symbolize_names_after_unsafe_cache
       skip unless ::Bootsnap::CompileCache::YAML.supported_options.include?(:symbolize_names)
 
@@ -178,6 +194,14 @@ class CompileCacheYAMLTest < Minitest::Test
         "bar" => [1],
       }
       assert_equal expected, document
+    end
+
+    def test_yaml_input_to_output_syntax_error_includes_filename
+      error = assert_raises Psych::SyntaxError do
+        ::Bootsnap::CompileCache::YAML::Psych3.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
+      end
+      assert_equal "bad.yml", error.file
+      assert_includes error.message, "bad.yml"
     end
 
     def test_load_file
@@ -275,6 +299,42 @@ class CompileCacheYAMLTest < Minitest::Test
       Help.set_file("a.yml", ::YAML.dump(bigint), 100)
       2.times { assert_equal(bigint, FakeYaml.unsafe_load_file("a.yml")) }
     end
+
+    def test_unsafe_load_file_syntax_error_includes_filename
+      Help.set_file("bad.yml", "a: 1\nb\nc: 2\n", 100)
+      expected_path = File.realpath("bad.yml")
+      error = assert_raises Psych::SyntaxError do
+        FakeYaml.unsafe_load_file("bad.yml")
+      end
+      assert_equal expected_path, error.file
+      assert_includes error.message, expected_path
+    end
+  end
+
+  def test_load_file_syntax_error_includes_filename
+    Help.set_file("bad.yml", "a: 1\nb\nc: 2\n", 100)
+    expected_path = File.realpath("bad.yml")
+    error = assert_raises Psych::SyntaxError do
+      FakeYaml.load_file("bad.yml")
+    end
+    assert_equal expected_path, error.file
+    assert_includes error.message, expected_path
+  end
+
+  def test_input_to_storage_syntax_error_includes_filename
+    error = assert_raises Psych::SyntaxError do
+      Bootsnap::CompileCache::YAML.implementation.input_to_storage("a: 1\nb\nc: 2\n", "bad.yml")
+    end
+    assert_equal "bad.yml", error.file
+    assert_includes error.message, "bad.yml"
+  end
+
+  def test_strict_load_syntax_error_includes_filename
+    error = assert_raises Psych::SyntaxError do
+      ::Bootsnap::CompileCache::YAML.strict_load("a: 1\nb\nc: 2\n", filename: "bad.yml")
+    end
+    assert_equal "bad.yml", error.file
+    assert_includes error.message, "bad.yml"
   end
 
   def test_no_read_permission

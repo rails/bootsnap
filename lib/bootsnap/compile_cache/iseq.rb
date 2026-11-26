@@ -24,6 +24,8 @@ module Bootsnap
       end
 
       if supported?
+        LOCATION_INDEPENDENT_ISEQ = RubyVM::InstructionSequence.method(:load_from_binary).arity == 1
+
         class Compiler
           attr_reader :namespace
 
@@ -99,16 +101,31 @@ module Bootsnap
             end
           end
 
-          def storage_to_output(binary, _args)
-            iseq = RubyVM::InstructionSequence.load_from_binary(binary)
-            binary.clear
-            iseq
-          rescue RuntimeError => error
-            if error.message == "broken binary format"
-              $stderr.puts("[Bootsnap::CompileCache] warning: rejecting broken binary")
-              nil
-            else
-              raise
+          if LOCATION_INDEPENDENT_ISEQ
+            def storage_to_output(binary, abspath)
+              iseq = RubyVM::InstructionSequence.load_from_binary(binary)
+              binary.clear
+              iseq
+            rescue RuntimeError => error
+              if error.message == "broken binary format"
+                $stderr.puts("[Bootsnap::CompileCache] warning: rejecting broken binary")
+                nil
+              else
+                raise
+              end
+            end
+          else
+            def storage_to_output(binary, abspath)
+              iseq = RubyVM::InstructionSequence.load_from_binary(binary, abspath, abspath)
+              binary.clear
+              iseq
+            rescue RuntimeError => error
+              if error.message == "broken binary format"
+                $stderr.puts("[Bootsnap::CompileCache] warning: rejecting broken binary")
+                nil
+              else
+                raise
+              end
             end
           end
 
@@ -135,15 +152,18 @@ module Bootsnap
         @default_compiler = DEFAULT
         @coverage_support_warning_emitted = false
 
-        def self.fetch(path, cache_dir: ISeq.cache_dir)
-          compiler = compiler_selector&.call(path) || default_compiler
+        def self.fetch(abspath, cache_dir: ISeq.cache_dir)
+          abspath = abspath.to_s
+
+          cache_key = LOCATION_INDEPENDENT_ISEQ ? CompileCache.normalize(abspath) : abspath
+          compiler = compiler_selector&.call(abspath) || default_compiler
 
           # Having coverage enabled prevents iseq dumping/loading.
           if coverage_on?
             return nil if compiler.equal?(DEFAULT)
 
             if coverage_supported?
-              return compiler.input_to_output(nil, path.to_s, nil)
+              return compiler.input_to_output(nil, abspath, nil)
             elsif !@coverage_support_warning_emitted
               @coverage_support_warning_emitted = true
               warn(<<~MSG)
@@ -159,21 +179,27 @@ module Bootsnap
             Bootsnap::CompileCache::Native.fetch(
               cache_dir,
               compiler.namespace,
-              path.to_s,
+              abspath,
+              cache_key,
               compiler,
-              nil,
+              abspath,
             )
           else
-            compiler.input_to_output(nil, path.to_s, nil)
+            compiler.input_to_output(nil, abspath, nil)
           end
         end
 
         def self.precompile(path)
           compiler = compiler_selector&.call(path) || default_compiler
+          abspath = abspath.to_s
+
+          cache_key = LOCATION_INDEPENDENT_ISEQ ? CompileCache.normalize(abspath) : abspath
+
           Bootsnap::CompileCache::Native.precompile(
             cache_dir,
             compiler.namespace,
-            path.to_s,
+            abspath,
+            cache_key,
             compiler,
           )
         end

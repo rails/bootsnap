@@ -42,6 +42,32 @@ module Bootsnap
       %w[ruby truffleruby].include?(RUBY_ENGINE) &&
         RUBY_PLATFORM.match?(/darwin|linux|bsd|mswin|mingw|cygwin/)
     end
+
+    RUBY_LIBDIR  = -RbConfig::CONFIG["rubylibdir"]
+    BUNDLER_PATH = Bootsnap.bundler? && -Bundler.bundle_path.to_s
+    APP_ROOT = -Dir.pwd
+    other_paths = [*Gem.path, -RbConfig::CONFIG["sitedir"]] - [RUBY_LIBDIR, BUNDLER_PATH, APP_ROOT]
+
+    OTHER_PATHS = other_paths.empty? ? nil : other_paths.freeze
+
+    def self.normalize(abspath)
+      # TODO: Can we even support `Dir.chdir`?
+      if abspath.start_with?(BUNDLER_PATH)
+        return "{BUNDLE}#{abspath.byteslice(BUNDLER_PATH.bytesize, abspath.bytesize)}"
+      end
+
+      OTHER_PATHS&.each do |path|
+        if abspath.start_with?(path)
+          return abspath.sub(path, "{OTHER}")
+        end
+      end
+
+      if abspath.start_with?(APP_ROOT)
+        return "{APP}#{abspath.byteslice(APP_ROOT.bytesize, abspath.bytesize)}"
+      end
+
+      abspath
+    end
   end
 end
 

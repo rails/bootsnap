@@ -109,8 +109,8 @@ static VALUE bs_instrumentation_enabled_set(VALUE self, VALUE enabled);
 static VALUE bs_readonly_set(VALUE self, VALUE enabled);
 static VALUE bs_revalidation_set(VALUE self, VALUE enabled);
 static VALUE bs_compile_option_crc32_set(VALUE self, VALUE crc32_v);
-static VALUE bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler, VALUE args);
-static VALUE bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler);
+static VALUE bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE key_v, VALUE handler, VALUE args);
+static VALUE bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE key_v, VALUE handler);
 
 /* Helpers */
 enum cache_status {
@@ -118,7 +118,7 @@ enum cache_status {
   hit,
   stale,
 };
-static void bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_path)[MAX_CACHEPATH_SIZE]);
+static void bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE key_v, char (* cache_path)[MAX_CACHEPATH_SIZE]);
 static int bs_read_key(int fd, struct bs_cache_key * key);
 static enum cache_status cache_key_equal_fast_path(struct bs_cache_key * k1, struct bs_cache_key * k2);
 static int cache_key_equal_slow_path(struct bs_cache_key * current_key, struct bs_cache_key * cached_key, const VALUE input_data);
@@ -299,8 +299,8 @@ Init_bootsnap(void)
   rb_define_module_function(rb_mBootsnap, "instrumentation_enabled=", bs_instrumentation_enabled_set, 1);
   rb_define_module_function(rb_mBootsnap_CompileCache_Native, "readonly=", bs_readonly_set, 1);
   rb_define_module_function(rb_mBootsnap_CompileCache_Native, "revalidation=", bs_revalidation_set, 1);
-  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "fetch", bs_rb_fetch, 5);
-  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "precompile", bs_rb_precompile, 4);
+  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "fetch", bs_rb_fetch, 6);
+  rb_define_module_function(rb_mBootsnap_CompileCache_Native, "precompile", bs_rb_precompile, 5);
   rb_define_module_function(rb_mBootsnap_CompileCache_Native, "compile_option_crc32=", bs_compile_option_crc32_set, 1);
 
   current_umask = umask(0777);
@@ -396,21 +396,18 @@ get_ruby_version_digest(void)
 }
 
 /*
- * Given a cache root directory and the full path to a file being cached,
+ * Given a cache root directory and the *normalized* path to a file being cached,
  * generate a path under the cache directory at which the cached artifact will
  * be stored.
  *
  * The path will look something like: <cachedir>/12/34567890abcdef
  *
- * `path_v` must already have been through FilePathValue(): the callers read it
- * with RSTRING_PTR() too, so the conversion has to happen in the frame that
- * owns the variable.
  */
 static void
-bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_path)[MAX_CACHEPATH_SIZE])
+bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE key_v, char (* cache_path)[MAX_CACHEPATH_SIZE])
 {
   Check_Type(cachedir_v, T_STRING);
-  Check_Type(path_v, T_STRING);
+  Check_Type(key_v, T_STRING);
 
   long namespace_len = 0;
   if (!NIL_P(namespace_v)) {
@@ -425,7 +422,7 @@ bs_cache_path(VALUE cachedir_v, VALUE namespace_v, VALUE path_v, char (* cache_p
   const char * cachedir = RSTRING_PTR(cachedir_v);
   const char * namespace = NIL_P(namespace_v) ? "" : RSTRING_PTR(namespace_v);
 
-  uint64_t hash = fnv1a_64_str(path_v);
+  uint64_t hash = fnv1a_64_str(key_v);
   uint8_t first_byte = (hash >> (64 - 8));
   uint64_t remainder = hash & 0x00ffffffffffffff;
 
@@ -521,14 +518,15 @@ static void bs_cache_key_digest(struct bs_cache_key *key,
  * conversions on the ruby VALUE arguments before passing them along.
  */
 static VALUE
-bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler, VALUE args)
+bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE key_v, VALUE handler, VALUE args)
 {
   FilePathValue(path_v);
+  FilePathValue(key_v);
 
   char cache_path[MAX_CACHEPATH_SIZE];
 
   /* generate cache path to cache_path */
-  bs_cache_path(cachedir_v, namespace_v, path_v, &cache_path);
+  bs_cache_path(cachedir_v, namespace_v, key_v, &cache_path);
 
   return bs_fetch(RSTRING_PTR(path_v), path_v, cache_path, handler, args);
 }
@@ -539,13 +537,14 @@ bs_rb_fetch(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE
  * and doesn't return the content.
  */
 static VALUE
-bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE handler)
+bs_rb_precompile(VALUE self, VALUE cachedir_v, VALUE namespace_v, VALUE path_v, VALUE key_v, VALUE handler)
 {
   FilePathValue(path_v);
+  FilePathValue(key_v);
 
   char cache_path[MAX_CACHEPATH_SIZE];
   /* generate cache path to cache_path */
-  bs_cache_path(cachedir_v, namespace_v, path_v, &cache_path);
+  bs_cache_path(cachedir_v, namespace_v, key_v, &cache_path);
 
   return bs_precompile(RSTRING_PTR(path_v), path_v, cache_path, handler);
 }

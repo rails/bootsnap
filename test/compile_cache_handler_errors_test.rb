@@ -21,7 +21,7 @@ class CompileCacheHandlerErrorsTest < Minitest::Test
   def test_input_to_storage_invalid_instance_of_expected_type
     path = Help.set_file("a.rb", "a = 3", 100)
     Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_storage).returns("broken")
-    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_output).with("a = 3", "a.rb", nil).returns("whatever")
+    Bootsnap::CompileCache::ISeq::DEFAULT.expects(:input_to_output).with("a = 3", "a.rb", "a.rb").returns("whatever")
     _, err = capture_subprocess_io do
       load(path)
     end

@@ -14,7 +14,7 @@ gem "rake"
 gem "rake-compiler"
 gem "minitest", "~> 5.0"
 gem "mocha", "> 3"
-
+gem "json", "< 3.2"
 group :development do
   gem "rubocop"
   gem "rubocop-performance"

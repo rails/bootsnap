@@ -309,4 +309,16 @@ class CompileCacheTest < Minitest::Test
     assert_kind_of(handler_error, raised.cause)
     assert_equal("handler failure", raised.cause.message)
   end
+
+  class NormalizeTests < Minitest::Test
+
+    def test_normalize
+      assert_equal "{APP}/foo.rb", Bootsnap::CompileCache.normalize(File.expand_path("foo.rb"))
+      assert_equal "{BUNDLE}/some_gem.rb", Bootsnap::CompileCache.normalize(File.expand_path("some_gem.rb", Bundler.bundle_path.to_s))
+      (Gem.path - [Bundler.bundle_path.to_s]).each do |path|
+        assert_equal "{OTHER}/some_gem.rb", Bootsnap::CompileCache.normalize(File.expand_path("some_gem.rb", path))
+      end
+      assert_equal "/unknown/foo.rb", Bootsnap::CompileCache.normalize("/unknown/foo.rb")
+    end
+  end
 end

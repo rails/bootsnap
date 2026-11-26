@@ -26,10 +26,14 @@ module Bootsnap
         def precompile(path)
           return false unless CompileCache::YAML.supported_internal_encoding?
 
+          abspath = path.to_s
+          cache_key = CompileCache.normalize(abspath)
+
           CompileCache::Native.precompile(
             cache_dir,
             nil,
-            path.to_s,
+            abspath,
+            cache_key,
             @implementation,
           )
         end
@@ -278,10 +282,13 @@ module Bootsnap
               return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
             end
 
+            abspath = File.realpath(path)
+            cache_key = CompileCache.normalize(abspath)
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
               nil,
-              File.realpath(path),
+              abspath,
+              cache_key,
               CompileCache::YAML::Psych4::SafeLoad,
               kwargs,
             )
@@ -299,10 +306,13 @@ module Bootsnap
               return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
             end
 
+            abspath = File.realpath(path)
+            cache_key = CompileCache.normalize(abspath)
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
               nil,
-              File.realpath(path),
+              abspath,
+              cache_key,
               CompileCache::YAML::Psych4::UnsafeLoad,
               kwargs,
             )
@@ -351,10 +361,14 @@ module Bootsnap
               return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
             end
 
+            abspath = File.realpath(path)
+            cache_key = CompileCache.normalize(abspath)
+
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
               nil,
-              File.realpath(path),
+              abspath,
+              cache_key,
               CompileCache::YAML::Psych3,
               kwargs,
             )
@@ -372,10 +386,14 @@ module Bootsnap
               return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
             end
 
+            abspath = File.realpath(path)
+            cache_key = CompileCache.normalize(abspath)
+
             CompileCache::Native.fetch(
               CompileCache::YAML.cache_dir,
               nil,
-              File.realpath(path),
+              abspath,
+              cache_key,
               CompileCache::YAML::Psych3,
               kwargs,
             )

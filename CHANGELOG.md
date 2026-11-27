@@ -1,5 +1,6 @@
 # Unreleased
 
+* Remove support for Psych 3.x and older. If Psych version is lower than 4, YAML caching is unsupported.
 * Preserve the filename in `Psych::SyntaxError` raised when loading or compiling invalid YAML files through the YAML compile cache.
 
 # 1.26.2

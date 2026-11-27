@@ -61,24 +61,6 @@ jobs:
           cache-version: 2
       - run: bundle exec rake
 
-  psych4:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu]
-        ruby: ['3.3']
-    runs-on: ${{ matrix.os }}-latest
-    env:
-      PSYCH_4: "1"
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
-          cache-version: 2
-      - run: bundle exec rake
-
   minimal:
     strategy:
       fail-fast: false

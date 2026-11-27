@@ -5,10 +5,7 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in bootsnap.gemspec
 gemspec
 
-if ENV["PSYCH_4"]
-  gem "psych", ">= 4"
-end
-
+gem "psych", ">= 4"
 gem "bundler"
 gem "rake"
 gem "rake-compiler"

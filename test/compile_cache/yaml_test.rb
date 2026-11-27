@@ -22,7 +22,7 @@ class CompileCacheYAMLTest < Minitest::Test
     skip("Unsupported platform") unless Bootsnap::CompileCache.supported?
     super
     Bootsnap::CompileCache::YAML.init!
-    FakeYaml.singleton_class.prepend(Bootsnap::CompileCache::YAML.patch)
+    FakeYaml.singleton_class.prepend(Bootsnap::CompileCache::YAML::Patch)
   end
 
   def test_yaml_strict_load
@@ -103,156 +103,82 @@ class CompileCacheYAMLTest < Minitest::Test
     end
   end
 
-  if YAML::VERSION >= "4"
-    def test_load_psych_4_with_alias
-      Help.set_file("a.yml", "foo: &foo\n  bar: 42\nplop:\n  <<: *foo", 100)
+  def test_load_psych_4_with_alias
+    Help.set_file("a.yml", "foo: &foo\n  bar: 42\nplop:\n  <<: *foo", 100)
 
-      foo = {"bar" => 42}
-      expected = {"foo" => foo, "plop" => foo}
-      assert_equal(expected, FakeYaml.unsafe_load_file("a.yml"))
+    foo = {"bar" => 42}
+    expected = {"foo" => foo, "plop" => foo}
+    assert_equal(expected, FakeYaml.unsafe_load_file("a.yml"))
 
-      assert_raises Psych::BadAlias do
-        FakeYaml.load_file("a.yml")
-      end
-    end
-
-    def test_load_psych_4_with_unsafe_class
-      Help.set_file("a.yml", "---\nfoo: !ruby/regexp /bar/\n", 100)
-
-      expected = {"foo" => /bar/}
-      assert_equal(expected, FakeYaml.unsafe_load_file("a.yml"))
-
-      assert_raises Psych::DisallowedClass do
-        FakeYaml.load_file("a.yml")
-      end
-    end
-
-    def test_yaml_input_to_output_safe
-      document = ::Bootsnap::CompileCache::YAML::Psych4::SafeLoad.input_to_output(<<~YAML, "file.yml", {})
-        ---
-        :foo: 42
-        bar: [1]
-      YAML
-      expected = {
-        foo: 42,
-        "bar" => [1],
-      }
-      assert_equal expected, document
-    end
-
-    def test_yaml_input_to_output_unsafe
-      document = ::Bootsnap::CompileCache::YAML::Psych4::UnsafeLoad.input_to_output(<<~YAML, "file.yml", {})
-        ---
-        :foo: 42
-        bar: [1]
-      YAML
-      expected = {
-        foo: 42,
-        "bar" => [1],
-      }
-      assert_equal expected, document
-    end
-
-    def test_yaml_input_to_output_safe_syntax_error_includes_filename
-      error = assert_raises Psych::SyntaxError do
-        ::Bootsnap::CompileCache::YAML::Psych4::SafeLoad.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
-      end
-      assert_equal "bad.yml", error.file
-      assert_includes error.message, "bad.yml"
-    end
-
-    def test_yaml_input_to_output_unsafe_syntax_error_includes_filename
-      error = assert_raises Psych::SyntaxError do
-        ::Bootsnap::CompileCache::YAML::Psych4::UnsafeLoad.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
-      end
-      assert_equal "bad.yml", error.file
-      assert_includes error.message, "bad.yml"
-    end
-
-    def test_load_file_symbolize_names_after_unsafe_cache
-      skip unless ::Bootsnap::CompileCache::YAML.supported_options.include?(:symbolize_names)
-
-      Help.set_file("a.yml", "---\nfoo: bar", 100)
-
-      kwargs = {symbolize_names: true}
-      FakeYaml.unsafe_load_file("a.yml", **kwargs)
-
-      2.times do
-        assert_equal({foo: "bar"}, FakeYaml.load_file("a.yml", **kwargs))
-        assert_equal({symbolize_names: true}, kwargs)
-      end
-    end
-  else
-    def test_yaml_input_to_output
-      document = ::Bootsnap::CompileCache::YAML::Psych3.input_to_output(<<~YAML, "file.yml", {})
-        ---
-        :foo: 42
-        bar: [1]
-      YAML
-      expected = {
-        foo: 42,
-        "bar" => [1],
-      }
-      assert_equal expected, document
-    end
-
-    def test_yaml_input_to_output_syntax_error_includes_filename
-      error = assert_raises Psych::SyntaxError do
-        ::Bootsnap::CompileCache::YAML::Psych3.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
-      end
-      assert_equal "bad.yml", error.file
-      assert_includes error.message, "bad.yml"
-    end
-
-    def test_load_file
-      Help.set_file("a.yml", "---\nfoo: bar", 100)
-      assert_equal({"foo" => "bar"}, FakeYaml.load_file("a.yml"))
-    end
-
-    def test_load_file_aliases
-      Help.set_file("a.yml", "foo: &foo\n  bar: 42\nplop:\n  <<: *foo", 100)
-      assert_equal({"foo" => {"bar" => 42}, "plop" => {"bar" => 42}}, FakeYaml.load_file("a.yml"))
-    end
-
-    def test_load_file_symbolize_names
-      Help.set_file("a.yml", "---\nfoo: bar", 100)
+    assert_raises Psych::BadAlias do
       FakeYaml.load_file("a.yml")
-
-      if ::Bootsnap::CompileCache::YAML.supported_options.include?(:symbolize_names)
-        2.times do
-          assert_equal({foo: "bar"}, FakeYaml.load_file("a.yml", symbolize_names: true))
-        end
-      else
-        assert_raises(FakeYaml::Fallback) do # would call super
-          FakeYaml.load_file("a.yml", symbolize_names: true)
-        end
-      end
     end
+  end
 
-    def test_load_file_freeze
-      Help.set_file("a.yml", "---\nfoo", 100)
+  def test_load_psych_4_with_unsafe_class
+    Help.set_file("a.yml", "---\nfoo: !ruby/regexp /bar/\n", 100)
+
+    expected = {"foo" => /bar/}
+    assert_equal(expected, FakeYaml.unsafe_load_file("a.yml"))
+
+    assert_raises Psych::DisallowedClass do
       FakeYaml.load_file("a.yml")
-
-      if ::Bootsnap::CompileCache::YAML.supported_options.include?(:freeze)
-        2.times do
-          string = FakeYaml.load_file("a.yml", freeze: true)
-          assert_equal("foo", string)
-          assert_predicate(string, :frozen?)
-        end
-      else
-        assert_raises(FakeYaml::Fallback) do # would call super
-          FakeYaml.load_file("a.yml", freeze: true)
-        end
-      end
     end
+  end
 
-    def test_load_file_unknown_option
-      Help.set_file("a.yml", "---\nfoo", 100)
-      FakeYaml.load_file("a.yml")
+  def test_yaml_input_to_output_safe
+    document = ::Bootsnap::CompileCache::YAML::SafeLoad.input_to_output(<<~YAML, "file.yml", {})
+      ---
+      :foo: 42
+      bar: [1]
+    YAML
+    expected = {
+      foo: 42,
+      "bar" => [1],
+    }
+    assert_equal expected, document
+  end
 
-      assert_raises(FakeYaml::Fallback) do # would call super
-        FakeYaml.load_file("a.yml", fallback: true)
-      end
+  def test_yaml_input_to_output_unsafe
+    document = ::Bootsnap::CompileCache::YAML::UnsafeLoad.input_to_output(<<~YAML, "file.yml", {})
+      ---
+      :foo: 42
+      bar: [1]
+    YAML
+    expected = {
+      foo: 42,
+      "bar" => [1],
+    }
+    assert_equal expected, document
+  end
+
+  def test_yaml_input_to_output_safe_syntax_error_includes_filename
+    error = assert_raises Psych::SyntaxError do
+      ::Bootsnap::CompileCache::YAML::SafeLoad.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
+    end
+    assert_equal "bad.yml", error.file
+    assert_includes error.message, "bad.yml"
+  end
+
+  def test_yaml_input_to_output_unsafe_syntax_error_includes_filename
+    error = assert_raises Psych::SyntaxError do
+      ::Bootsnap::CompileCache::YAML::UnsafeLoad.input_to_output("a: 1\nb\nc: 2\n", "bad.yml", {})
+    end
+    assert_equal "bad.yml", error.file
+    assert_includes error.message, "bad.yml"
+  end
+
+  def test_load_file_symbolize_names_after_unsafe_cache
+    skip unless ::Bootsnap::CompileCache::YAML.supported_options.include?(:symbolize_names)
+
+    Help.set_file("a.yml", "---\nfoo: bar", 100)
+
+    kwargs = {symbolize_names: true}
+    FakeYaml.unsafe_load_file("a.yml", **kwargs)
+
+    2.times do
+      assert_equal({foo: "bar"}, FakeYaml.load_file("a.yml", **kwargs))
+      assert_equal({symbolize_names: true}, kwargs)
     end
   end
 
@@ -271,44 +197,42 @@ class CompileCacheYAMLTest < Minitest::Test
     refute Bootsnap::CompileCache::YAML.precompile("a.yml")
   end
 
-  if YAML.respond_to?(:unsafe_load_file)
-    def test_unsafe_load_file
-      Help.set_file("a.yml", "foo: &foo\n  bar: 42\nplop:\n  <<: *foo", 100)
-      assert_equal({"foo" => {"bar" => 42}, "plop" => {"bar" => 42}}, FakeYaml.unsafe_load_file("a.yml"))
-    end
+  def test_unsafe_load_file
+    Help.set_file("a.yml", "foo: &foo\n  bar: 42\nplop:\n  <<: *foo", 100)
+    assert_equal({"foo" => {"bar" => 42}, "plop" => {"bar" => 42}}, FakeYaml.unsafe_load_file("a.yml"))
+  end
 
-    def test_unsafe_load_file_supports_regexp
-      Help.set_file("a.yml", ::YAML.dump(foo: /bar/), 100)
-      assert_equal({foo: /bar/}, FakeYaml.unsafe_load_file("a.yml"))
-    end
+  def test_unsafe_load_file_supports_regexp
+    Help.set_file("a.yml", ::YAML.dump(foo: /bar/), 100)
+    assert_equal({foo: /bar/}, FakeYaml.unsafe_load_file("a.yml"))
+  end
 
-    def test_unsafe_load_file_supports_date
-      today = Date.today
-      Help.set_file("a.yml", ::YAML.dump(today), 100)
-      2.times { assert_equal(today, FakeYaml.unsafe_load_file("a.yml")) }
-    end
+  def test_unsafe_load_file_supports_date
+    today = Date.today
+    Help.set_file("a.yml", ::YAML.dump(today), 100)
+    2.times { assert_equal(today, FakeYaml.unsafe_load_file("a.yml")) }
+  end
 
-    def test_unsafe_load_file_supports_datetime
-      dt = DateTime.now
-      Help.set_file("a.yml", ::YAML.dump(dt), 100)
-      2.times { assert_equal(dt, FakeYaml.unsafe_load_file("a.yml")) }
-    end
+  def test_unsafe_load_file_supports_datetime
+    dt = DateTime.now
+    Help.set_file("a.yml", ::YAML.dump(dt), 100)
+    2.times { assert_equal(dt, FakeYaml.unsafe_load_file("a.yml")) }
+  end
 
-    def test_unsafe_load_file_supports_bigint
-      bigint = 2**150
-      Help.set_file("a.yml", ::YAML.dump(bigint), 100)
-      2.times { assert_equal(bigint, FakeYaml.unsafe_load_file("a.yml")) }
-    end
+  def test_unsafe_load_file_supports_bigint
+    bigint = 2**150
+    Help.set_file("a.yml", ::YAML.dump(bigint), 100)
+    2.times { assert_equal(bigint, FakeYaml.unsafe_load_file("a.yml")) }
+  end
 
-    def test_unsafe_load_file_syntax_error_includes_filename
-      Help.set_file("bad.yml", "a: 1\nb\nc: 2\n", 100)
-      expected_path = File.realpath("bad.yml")
-      error = assert_raises Psych::SyntaxError do
-        FakeYaml.unsafe_load_file("bad.yml")
-      end
-      assert_equal expected_path, error.file
-      assert_includes error.message, expected_path
+  def test_unsafe_load_file_syntax_error_includes_filename
+    Help.set_file("bad.yml", "a: 1\nb\nc: 2\n", 100)
+    expected_path = File.realpath("bad.yml")
+    error = assert_raises Psych::SyntaxError do
+      FakeYaml.unsafe_load_file("bad.yml")
     end
+    assert_equal expected_path, error.file
+    assert_includes error.message, expected_path
   end
 
   def test_load_file_syntax_error_includes_filename
@@ -323,7 +247,7 @@ class CompileCacheYAMLTest < Minitest::Test
 
   def test_input_to_storage_syntax_error_includes_filename
     error = assert_raises Psych::SyntaxError do
-      Bootsnap::CompileCache::YAML.implementation.input_to_storage("a: 1\nb\nc: 2\n", "bad.yml")
+      Bootsnap::CompileCache::YAML.input_to_storage("a: 1\nb\nc: 2\n", "bad.yml")
     end
     assert_equal "bad.yml", error.file
     assert_includes error.message, "bad.yml"

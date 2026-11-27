@@ -15,6 +15,119 @@ module Bootsnap
         Encoding::BINARY,
       ].freeze
 
+      module UnsafeLoad
+        extend self
+
+        def input_to_storage(contents, path)
+          obj = ::YAML.unsafe_load(contents, filename: path)
+          packer = CompileCache::YAML.msgpack_factory.packer
+          packer.pack(false) # not safe loaded
+          begin
+            packer.pack(obj)
+          rescue NoMethodError, RangeError
+            return UNCOMPILABLE # The object included things that we can't serialize
+          end
+          packer.to_s
+        end
+
+        def storage_to_output(data, kwargs)
+          unpacker = CompileCache::YAML.msgpack_factory.unpacker(
+            CompileCache::YAML.msgpack_unpacker_options(kwargs),
+          )
+          unpacker.feed(data)
+          _safe_loaded = unpacker.unpack
+          result = unpacker.unpack
+          data.clear
+          result
+        end
+
+        def input_to_output(data, path, kwargs)
+          ::YAML.unsafe_load(data, filename: path, **(kwargs || {}))
+        end
+      end
+
+      module SafeLoad
+        extend self
+
+        def input_to_storage(contents, path)
+          obj = begin
+            CompileCache::YAML.strict_load(contents, filename: path)
+          rescue Psych::DisallowedClass, Psych::BadAlias, Uncompilable
+            return UNCOMPILABLE
+          end
+
+          packer = CompileCache::YAML.msgpack_factory.packer
+          packer.pack(true) # safe loaded
+          begin
+            packer.pack(obj)
+          rescue NoMethodError, RangeError
+            return UNCOMPILABLE
+          end
+          packer.to_s
+        end
+
+        def storage_to_output(data, kwargs)
+          unpacker = CompileCache::YAML.msgpack_factory.unpacker(
+            CompileCache::YAML.msgpack_unpacker_options(kwargs),
+          )
+          unpacker.feed(data)
+          safe_loaded = unpacker.unpack
+          if safe_loaded
+            unpacker.unpack
+          else
+            UNCOMPILABLE
+          end
+        end
+
+        def input_to_output(data, path, kwargs)
+          ::YAML.load(data, filename: path, **(kwargs || {}))
+        end
+      end
+
+      module Patch
+        def load_file(path, *args)
+          return super unless CompileCache::YAML.supported_internal_encoding?
+
+          return super if args.size > 1
+
+          if (kwargs = args.first)
+            return super unless kwargs.is_a?(Hash)
+            return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
+          end
+
+          CompileCache::Native.fetch(
+            CompileCache::YAML.cache_dir,
+            nil,
+            File.realpath(path),
+            CompileCache::YAML::SafeLoad,
+            kwargs,
+          )
+        end
+
+        ruby2_keywords :load_file if respond_to?(:ruby2_keywords, true)
+
+        def unsafe_load_file(path, *args)
+          return super unless CompileCache::YAML.supported_internal_encoding?
+
+          return super if args.size > 1
+
+          if (kwargs = args.first)
+            return super unless kwargs.is_a?(Hash)
+            return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
+          end
+
+          CompileCache::Native.fetch(
+            CompileCache::YAML.cache_dir,
+            nil,
+            File.realpath(path),
+            CompileCache::YAML::UnsafeLoad,
+            kwargs,
+          )
+        end
+
+        ruby2_keywords :unsafe_load_file if respond_to?(:ruby2_keywords, true)
+      end
+
       class << self
         attr_accessor(:msgpack_factory, :supported_options)
         attr_reader(:implementation, :cache_dir)
@@ -30,14 +143,22 @@ module Bootsnap
             cache_dir,
             nil,
             path.to_s,
-            @implementation,
+            self,
           )
         end
 
         def install!(cache_dir)
           self.cache_dir = cache_dir
           init!
-          ::YAML.singleton_class.prepend(@implementation::Patch)
+          ::YAML.singleton_class.prepend(Patch)
+        end
+
+        def input_to_storage(contents, path)
+          obj = SafeLoad.input_to_storage(contents, path)
+          if UNCOMPILABLE.equal?(obj)
+            obj = UnsafeLoad.input_to_storage(contents, path)
+          end
+          obj
         end
 
         # Psych coerce strings to `Encoding.default_internal` but Message Pack only support
@@ -52,10 +173,7 @@ module Bootsnap
           require "msgpack"
           require "date"
 
-          @implementation = ::YAML::VERSION >= "4" ? Psych4 : Psych3
-          if @implementation::Patch.method_defined?(:unsafe_load_file) && !::YAML.respond_to?(:unsafe_load_file)
-            @implementation::Patch.send(:remove_method, :unsafe_load_file)
-          end
+          return if ::YAML::VERSION < "4"
 
           unless const_defined?(:NoTagsVisitor)
             visitor = Class.new(Psych::Visitors::NoAliasRuby) do
@@ -164,10 +282,6 @@ module Bootsnap
           supported_options.freeze
         end
 
-        def patch
-          @implementation::Patch
-        end
-
         def strict_load(payload, filename: nil)
           ast = ::YAML.parse(payload, filename: filename)
           return ast unless ast
@@ -184,204 +298,6 @@ module Bootsnap
           kwargs = kwargs.dup
           kwargs[:symbolize_keys] = kwargs.delete(:symbolize_names)
           kwargs
-        end
-      end
-
-      module Psych4
-        extend self
-
-        def input_to_storage(contents, path)
-          obj = SafeLoad.input_to_storage(contents, path)
-          if UNCOMPILABLE.equal?(obj)
-            obj = UnsafeLoad.input_to_storage(contents, path)
-          end
-          obj
-        end
-
-        module UnsafeLoad
-          extend self
-
-          def input_to_storage(contents, path)
-            obj = ::YAML.unsafe_load(contents, filename: path)
-            packer = CompileCache::YAML.msgpack_factory.packer
-            packer.pack(false) # not safe loaded
-            begin
-              packer.pack(obj)
-            rescue NoMethodError, RangeError
-              return UNCOMPILABLE # The object included things that we can't serialize
-            end
-            packer.to_s
-          end
-
-          def storage_to_output(data, kwargs)
-            unpacker = CompileCache::YAML.msgpack_factory.unpacker(
-              CompileCache::YAML.msgpack_unpacker_options(kwargs),
-            )
-            unpacker.feed(data)
-            _safe_loaded = unpacker.unpack
-            result = unpacker.unpack
-            data.clear
-            result
-          end
-
-          def input_to_output(data, path, kwargs)
-            ::YAML.unsafe_load(data, filename: path, **(kwargs || {}))
-          end
-        end
-
-        module SafeLoad
-          extend self
-
-          def input_to_storage(contents, path)
-            obj = begin
-              CompileCache::YAML.strict_load(contents, filename: path)
-            rescue Psych::DisallowedClass, Psych::BadAlias, Uncompilable
-              return UNCOMPILABLE
-            end
-
-            packer = CompileCache::YAML.msgpack_factory.packer
-            packer.pack(true) # safe loaded
-            begin
-              packer.pack(obj)
-            rescue NoMethodError, RangeError
-              return UNCOMPILABLE
-            end
-            packer.to_s
-          end
-
-          def storage_to_output(data, kwargs)
-            unpacker = CompileCache::YAML.msgpack_factory.unpacker(
-              CompileCache::YAML.msgpack_unpacker_options(kwargs),
-            )
-            unpacker.feed(data)
-            safe_loaded = unpacker.unpack
-            if safe_loaded
-              unpacker.unpack
-            else
-              UNCOMPILABLE
-            end
-          end
-
-          def input_to_output(data, path, kwargs)
-            ::YAML.load(data, filename: path, **(kwargs || {}))
-          end
-        end
-
-        module Patch
-          def load_file(path, *args)
-            return super unless CompileCache::YAML.supported_internal_encoding?
-
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
-
-            CompileCache::Native.fetch(
-              CompileCache::YAML.cache_dir,
-              nil,
-              File.realpath(path),
-              CompileCache::YAML::Psych4::SafeLoad,
-              kwargs,
-            )
-          end
-
-          ruby2_keywords :load_file if respond_to?(:ruby2_keywords, true)
-
-          def unsafe_load_file(path, *args)
-            return super unless CompileCache::YAML.supported_internal_encoding?
-
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
-
-            CompileCache::Native.fetch(
-              CompileCache::YAML.cache_dir,
-              nil,
-              File.realpath(path),
-              CompileCache::YAML::Psych4::UnsafeLoad,
-              kwargs,
-            )
-          end
-
-          ruby2_keywords :unsafe_load_file if respond_to?(:ruby2_keywords, true)
-        end
-      end
-
-      module Psych3
-        extend self
-
-        def input_to_storage(contents, path)
-          obj = ::YAML.load(contents, filename: path)
-          packer = CompileCache::YAML.msgpack_factory.packer
-          packer.pack(false) # not safe loaded
-          begin
-            packer.pack(obj)
-          rescue NoMethodError, RangeError
-            return UNCOMPILABLE # The object included things that we can't serialize
-          end
-          packer.to_s
-        end
-
-        def storage_to_output(data, kwargs)
-          unpacker = CompileCache::YAML.msgpack_factory.unpacker(
-            CompileCache::YAML.msgpack_unpacker_options(kwargs),
-          )
-          unpacker.feed(data)
-          _safe_loaded = unpacker.unpack
-          unpacker.unpack
-        end
-
-        def input_to_output(data, path, kwargs)
-          ::YAML.load(data, filename: path, **(kwargs || {}))
-        end
-
-        module Patch
-          def load_file(path, *args)
-            return super unless CompileCache::YAML.supported_internal_encoding?
-
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
-
-            CompileCache::Native.fetch(
-              CompileCache::YAML.cache_dir,
-              nil,
-              File.realpath(path),
-              CompileCache::YAML::Psych3,
-              kwargs,
-            )
-          end
-
-          ruby2_keywords :load_file if respond_to?(:ruby2_keywords, true)
-
-          def unsafe_load_file(path, *args)
-            return super unless CompileCache::YAML.supported_internal_encoding?
-
-            return super if args.size > 1
-
-            if (kwargs = args.first)
-              return super unless kwargs.is_a?(Hash)
-              return super unless (kwargs.keys - CompileCache::YAML.supported_options).empty?
-            end
-
-            CompileCache::Native.fetch(
-              CompileCache::YAML.cache_dir,
-              nil,
-              File.realpath(path),
-              CompileCache::YAML::Psych3,
-              kwargs,
-            )
-          end
-
-          ruby2_keywords :unsafe_load_file if respond_to?(:ruby2_keywords, true)
         end
       end
     end
